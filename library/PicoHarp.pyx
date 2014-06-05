@@ -83,6 +83,10 @@ class Discoverer:
     def count(self):
         return len(self._instruments.keys())
 
+    @property
+    def serials(self):
+        return self._instruments.keys()
+
     def search(self,serial):
         if serial in self._instruments.keys():
             return self._instruments[serial]
@@ -108,6 +112,7 @@ class Instrument:
         err = PH_Initialize(self._devidx,self._mode)
         if err != ERROR_NONE:
             raise IOError("Init error (%d)"%(err))
+        print("Instrument initialised")
         self._HW_Model = " "*16
         self._HW_PartNo = " "*8
         self._HW_Version = " "*8
@@ -121,3 +126,4 @@ class Instrument:
         err = PH_Calibrate(self._devidx)
         if err != ERROR_NONE:
             raise IOError("Calibration error (%d)"%(err))
+        print("Instrument calibration done")
