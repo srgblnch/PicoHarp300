@@ -1,0 +1,70 @@
+The library and the API can be get from:
+http://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/picoharp-300-stand-alone-tcspc-module-with-usb-interface
+
+Event that and for simplicity, here is explained a bit the steps to follow.
+
+1.- udev
+
+add a rulen in the /etc/udev/rules.d directory to respond to the vendor an 
+instrument product:
+ATTR{idVendor}=="0e0d", ATTR{idProduct}=="0003", MODE="0666"
+
+This numbering can be saw when having one instrument plugged and lsusb is 
+called. After that, reload udev rules or reboot the machine.
+
+2.- locate the original library
+
+define an ARCH variable with your bit architecture
+
+$ sudo mkdir /usr/local/lib/ph300
+$ sudo cp lib$ARCH/phlib.so /usr/local/lib/ph300/
+$ sudo chmod 755 /usr/local/lib/ph300/phlib.so
+$ sudo cp phlib.h  /usr/local/lib/ph300/
+$ sudo cp phdefin.h  /usr/local/lib/ph300/
+$ sudo cp errorcodes.h  /usr/local/lib/ph300/
+$ sudo chmod 644 /usr/local/lib/ph300/*.h
+$ sudo ln -s /usr/local/lib/ph300/phlib.so /usr/lib/libph300.so
+
+This driver expects the library to be in: /usr/local/lib/ph300
+and a symlink in: /usr/lib/
+
+Their howto places the headers in: /usr/local/lib/ph300/
+And that's why of python extension tries to find them there.
+
+Build Python extension:
+- Having the headers in place and the library in there,
+- having the files 'PicoHarp.c' and 'setup.py', execute:
+$ python setup.py install
+
+This will left the file:
+- build/lib.(...)/PicoHarp.so
+
+Where this .so has to be lefted in a pythonpath and then 
+it can be imported from python.
+
+As an example:
+
+ldd PicoHarp.so 
+        linux-vdso.so.1
+        PIC
+        libph300.so
+        libpthread.so.0
+        libc.so.6
+        libusb-0.1.so.4
+        libm.so.6
+        /lib64/ld-linux-x86-64.so.2
+
+ldd /usr/lib/libph300.so
+        linux-vdso.so.1
+        libusb-0.1.so.4 => /lib/x86_64-linux-gnu/libusb-0.1.so.4
+        libm.so.6
+        libc.so.6
+        /lib64/ld-linux-x86-64.so.2
+
+3.- using in Python
+
+>>> import PicoHarp
+>>> PicoHarp.__version__()
+'3.0'
+
+Where this number comes from a call to the manufacturer's library.
