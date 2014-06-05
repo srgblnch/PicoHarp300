@@ -32,9 +32,18 @@
 
 MAJOR_VERSION,MINOR_VERSION = 3,0#this comes from the phlib
 BUILD_VERSION = 0
-#REVISION_VERSION = 0
+REVISION_VERSION = 0
 
-from distutils.core import setup, Extension
+import warnings
+try:
+    from Cython.Distutils import build_ext
+    from setuptools import setup, Extension
+    HAVE_CYTHON = True
+except ImportError as e:
+    HAVE_CYTHON = False
+    warnings.warn(e.message)
+    from distutils.core import setup, Extension
+    from distutils.command import build_ext
 
 PicoHarpModule = Extension('PicoHarp',
                            define_macros = [('MAJOR_VERSION',
@@ -43,17 +52,24 @@ PicoHarpModule = Extension('PicoHarp',
                                              '%d'%MINOR_VERSION),
                                             ('BUILD_VERSION',
                                              '%d'%BUILD_VERSION)],
-                           include_dirs=['/usr/local/lib/ph300/'],
+                           include_dirs = ['/usr/local/lib/ph300/'],
                            library_dirs=['/usr/lib'],
                            libraries = ['ph300'],
-                           sources = ['PicoHarp.c']
-                          )
+                           sources = ['PicoHarp.pyx'])
 
-setup(name = 'PicoHarp',
-      version = '%d.%d.%s'%(MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION),
-      description = "TODO: pending",
-      long_description = '''TODO: Long description pending''',
-      author = "Sergi Blanch-Torn\'e",
-      author_email = "sblanch@cells.es",
-      ext_modules = [PicoHarpModule]
-     )
+configuration = {'name':'PicoHarp',
+                 'version':'%d.%d.%d'
+                            %(MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION),
+                 'description': "TODO: pending",
+                 'long_description':'''TODO: Long description pending''',
+                 'author':"Sergi Blanch-Torn\'e",
+                 'author_email':"sblanch@cells.es",
+                 'install_requires': ['cython==0.11'],
+                 'ext_modules': [PicoHarpModule],
+                 'cmdclass': {'build_ext': build_ext}}
+
+if not HAVE_CYTHON:
+    PicoHarpModule.sources[0] = 'PicoHarp.c'
+    configuration.pop('install_requires')
+
+setup(**configuration)
