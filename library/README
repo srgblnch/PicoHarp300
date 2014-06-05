@@ -63,27 +63,15 @@ section 3.
 To build Python extension, execute:
 $ python setup.py build
 
-
-
-
-
-
-
-
-
-
-
-- Having the headers in place and the library in there,
-- having the files 'PicoHarp.c' and 'setup.py', execute:
-
-
-This will left the file:
+6.- Others
+==========
+After the step 5, it will left the file:
 - build/lib.(...)/PicoHarp.so
 
-Where this .so has to be lefted in a pythonpath and then 
-it can be imported from python.
+Where this .so has to be lefted in a pythonpath and then it can be imported 
+from python.
 
-As an example:
+Please check that the dynamic links are correctly found:
 
 ldd PicoHarp.so 
         linux-vdso.so.1
@@ -102,10 +90,47 @@ ldd /usr/lib/libph300.so
         libc.so.6
         /lib64/ld-linux-x86-64.so.2
 
-3.- using in Python
+7.- Using it from python
+========================
 
 >>> import PicoHarp
 >>> PicoHarp.__version__()
-'3.0'
+'3.0.0'
 
-Where this number comes from a call to the manufacturer's library.
+Where the two first numbers comes from the manufacturer's library and the 
+minor one is set with in the cython extension.
+
+Search for instruments in your computer:
+
+>>> discoverer = PicoHarp.Discoverer()
+Searching for PicoHarp devices...
+Devidx     Status
+  0        S/N NNNNNNN
+  1        no device
+  2        no device
+  3        no device
+  4        no device
+  5        no device
+  6        no device
+  7        no device
+  
+(This output will be moved to a debug log later on.)
+
+To know how many instruments were found:
+>>> discoverer.count
+1
+
+To know the serials of the instruments found:
+>>> discoverer.serials
+
+To know the identification for the serial of your instrument
+>>> discoverer.search("NNNNNNN")
+
+Given the serial of the instrument you like to use, you can connect to it:
+>>> instrument = PicoHarp.Instrument(0)
+Instrument initialised
+Found Model PicoHarp 300 Partnum 930004 Version 2.0  
+Instrument calibration done
+
+(This output will also be moved to a debug log later on.)
+
