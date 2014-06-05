@@ -30,6 +30,8 @@
 ##
 ###############################################################################
 
+from version import MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION,REVISION_VERSION
+
 cdef extern from "phlib.h":
     int PH_GetLibraryVersion(char* version)
     int PH_GetErrorString(char* errstring, int errcode)
@@ -46,7 +48,7 @@ def __version__():
     # and cut it with the end string tag \x00.
     err = PH_GetLibraryVersion(version)
     if err == ERROR_NONE:
-        return strcut(version)+".0"
+        return strcut(version)+".%d-%d"%(BUILD_VERSION,REVISION_VERSION)
     else:
         raise Exception("cannot get the version")
 
@@ -127,3 +129,4 @@ class Instrument:
         if err != ERROR_NONE:
             raise IOError("Calibration error (%d)"%(err))
         print("Instrument calibration done")
+    
