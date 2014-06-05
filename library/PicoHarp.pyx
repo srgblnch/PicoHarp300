@@ -212,7 +212,7 @@ class Instrument(Logger):
         self.getCountRates()
         self.startMeas()
         waitloop = 0
-        while(self.getCounterStatus==0):
+        while(self.getCounterStatus()==0):
             waitloop += 1
         self.stopMeas()
         self.getHistogram()
@@ -383,7 +383,7 @@ class Instrument(Logger):
         if err != ERROR_NONE:
             raise IOError("CTCStatus error (%d): %s"
                           %(err,self.interpretError(err)))
-        self.debug("counter status = %d"%(ctcstatus))
+        #self.debug("counter status = %d"%(ctcstatus))
         return ctcstatus
 
     def stopMeas(self):
