@@ -168,3 +168,8 @@ Histogram: [0L, 0L, 0L, 0L, 0L, 0L, 0L (...) 0L, 0L, 0L, 0L, 0L, 0L, 0L]
 
 >>> len(histogram)
 65536
+
+A way to see this histogram can be:
+>>> import matplotlib.pyplot as plt
+>>> plt.plot(histogram)
+>>> plt.show()
