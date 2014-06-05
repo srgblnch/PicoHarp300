@@ -157,7 +157,7 @@ cdef extern from "phdefin.h":
 
 class Instrument(Logger):
     def __init__(self,devidx,mode=MODE_HIST,divider=8,binning=0,offset=0,
-                 acqTime=1000,CFDLevels=[100,100],CFDZeroCross=[10,10],
+                 acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  debug=False):
         Logger.__init__(self, debug)
         self._devidx = devidx
@@ -185,6 +185,7 @@ class Instrument(Logger):
         self._Binning = binning
         self._Offset = offset
         self._acquisitionTime = acqTime#ms
+        self._block = block
         #readonly parameters
         self._Resolution = 0.0
         #outputs
@@ -195,6 +196,7 @@ class Instrument(Logger):
         self.prepare()
 
     def prepare(self):
+        self.debug("Preparing the instrument to acquire.")
         self.setSyncDivider()
         self.setInputCFD(0)
         self.setInputCFD(1)
@@ -284,6 +286,14 @@ class Instrument(Logger):
             CFDZeroCross = self._CFDZeroCross[channel]
         if CFDLevel == None:
             CFDLevel = self._CFDLevel[channel]
+        if CFDLevel < DISCRMIN:
+            raise ValueError("CFD levels must be above %d"%(DISCRMIN))
+        if CFDLevel > DISCRMAX:
+            raise ValueError("CFD levels must be below %d"%(DISCRMAX))
+        if CFDZeroCross < ZCMIN:
+            raise ValueError("CFD zero cross must be above %d"%(ZCMIN))
+        if CFDZeroCross > ZCMAX:
+            raise ValueError("CFD zero cross must be below %d"%(ZCMAX))
         err = PH_SetInputCFD(self._devidx,channel,CFDLevel,CFDZeroCross)
         if err != ERROR_NONE:
             raise IOError("setInputCFD error (%d): %s"
@@ -356,12 +366,19 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         self.debug("Overflow stopper set")
 
-    def clearHistMem(self):
-        err = PH_ClearHistMem(self._devidx,0)
+    def getBlock(self):
+        return self._block
+    def setBlock(self,block):
+        self._block = block
+
+    def clearHistMem(self,block=None):
+        if block == None:
+            block = self._block
+        err = PH_ClearHistMem(self._devidx,block)
         if err != ERROR_NONE:
             raise IOError("ClearHistMem error (%d): %s"
                           %(err,self.interpretError(err)))
-        self.debug("Histogram memory clean")
+        self.debug("Histogram memory (block %d) clean"%(block))
 
     def getAcquisitionTime(self):
         return self._acquisitionTime
@@ -393,12 +410,14 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         self.debug("stop measurement")
 
-    def getHistogram(self):
+    def getHistogram(self,block=None):
+        if block == None:
+            block = self._block
         #cdef np.ndarray[np.uint32_t, ndim=1] counts = np.zeros([HISTCHAN],
         #                                                      dtype=np.uint32)
         cdef unsigned int *counts
         counts = <unsigned int*>malloc(HISTCHAN*cython.sizeof(int))
-        err = PH_GetHistogram(self._devidx,counts,0)
+        err = PH_GetHistogram(self._devidx,counts,block)
         if err != ERROR_NONE:
             raise IOError("GetHistogram error (%d): %s"
                           %(err,self.interpretError(err)))
@@ -406,11 +425,11 @@ class Instrument(Logger):
             self._counts[i] = counts[i]
         free(counts)
         if len(self._counts)>21:
-            self.debug("Histogram: %s (...) %s"
-                       %(repr(self._counts[:7])[:-1],
+            self.debug("Histogram (block %d): %s (...) %s"
+                       %(block,repr(self._counts[:7])[:-1],
                          repr(self._counts[-7:])[1:]))
         else:
-            self.debug("Histogram: %s"%(self._counts))
+            self.debug("Histogram (block %d): %s"%(block,self._counts))
         return self._counts
 
     def getFlags(self):
