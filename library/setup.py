@@ -30,9 +30,7 @@
 ##
 ###############################################################################
 
-MAJOR_VERSION,MINOR_VERSION = 3,0#this comes from the phlib
-BUILD_VERSION = 0
-REVISION_VERSION = 0
+from version import *
 
 import warnings
 try:
@@ -51,15 +49,18 @@ PicoHarpModule = Extension('PicoHarp',
                                             ('MINOR_VERSION',
                                              '%d'%MINOR_VERSION),
                                             ('BUILD_VERSION',
-                                             '%d'%BUILD_VERSION)],
+                                             '%d'%BUILD_VERSION),
+                                            ('REVISION_VERSION',
+                                             '%d'%REVISION_VERSION)],
                            include_dirs = ['/usr/local/lib/ph300/'],
                            library_dirs=['/usr/lib'],
                            libraries = ['ph300'],
                            sources = ['PicoHarp.pyx'])
 
 configuration = {'name':'PicoHarp',
-                 'version':'%d.%d.%d'
-                            %(MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION),
+                 'version':'%d.%d.%d.%d'
+                            %(MAJOR_VERSION,MINOR_VERSION,
+                              BUILD_VERSION,REVISION_VERSION),
                  'description': "TODO: pending",
                  'long_description':'''TODO: Long description pending''',
                  'author':"Sergi Blanch-Torn\'e",

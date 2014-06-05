@@ -95,10 +95,11 @@ ldd /usr/lib/libph300.so
 
 >>> import PicoHarp
 >>> PicoHarp.__version__()
-'3.0.0'
+'3.0.0-0'
 
-Where the two first numbers comes from the manufacturer's library and the 
-minor one is set with in the cython extension.
+Where the two first numbers comes from the manufacturer's library and the two 
+on the right are internal from this extension and they are defined in the 
+version.py file.
 
 Search for instruments in your computer:
 
