@@ -92,6 +92,9 @@ ldd /usr/lib/libph300.so
 
 7.- Using it from python
 ========================
+To do the same than in the dlldemo given in from the manufacturer's software
+(mention at the beginning of this document) where there is a procedure to do 
+similar action but with in a python console.
 
 >>> import PicoHarp
 >>> PicoHarp.__version__()
@@ -103,11 +106,11 @@ version.py file.
 
 Search for instruments in your computer:
 
->>> discoverer = PicoHarp.Discoverer()
+>>> discoverer = PicoHarp.Discoverer(debug=True)
 Searching for PicoHarp devices...
 Devidx     Status
   0        S/N NNNNNNN
-  1        no device
+  1        ERROR_DEVICE_BUSY
   2        no device
   3        no device
   4        no device
@@ -115,7 +118,7 @@ Devidx     Status
   6        no device
   7        no device
   
-(This output will be moved to a debug log later on.)
+(This output is only present if you have flagged for debug.)
 
 To know how many instruments were found:
 >>> discoverer.count
@@ -123,15 +126,45 @@ To know how many instruments were found:
 
 To know the serials of the instruments found:
 >>> discoverer.serials
+["NNNNNNN"]
 
 To know the identification for the serial of your instrument
 >>> discoverer.search("NNNNNNN")
+0
 
 Given the serial of the instrument you like to use, you can connect to it:
->>> instrument = PicoHarp.Instrument(0)
+>>> instrument = PicoHarp.Instrument(0,debug=True)
 Instrument initialised
 Found Model PicoHarp 300 Partnum 930004 Version 2.0  
 Instrument calibration done
+SetSyncDiv has been set (8)
+setInputCFD has been set for channel 0: (CFDLevel:100,CFDZeroCross:10)
+setInputCFD has been set for channel 1: (CFDLevel:100,CFDZeroCross:10)
+Binning = 0
+Offset = 0
+Resolution = 4
+CountRate[0] = 0
+CountRate[1] = 0
+Overflow stopper set
 
-(This output will also be moved to a debug log later on.)
+(This output is only present if you have flagged for debug.)
 
+>>> instrument.acquire()
+Histogram memory clean
+CountRate[0] = 0
+CountRate[1] = 0
+start measurement
+stop measurement
+Histogram: [0L, 0L, 0L, 0L, 0L, 0L, 0L (...) 0L, 0L, 0L, 0L, 0L, 0L, 0L]
+Flags: 0b10100100
+Integral count = 0
+waitloop = 0 total count = 0
+
+>>> histogram = instrument.getHistogram()
+Histogram: [0L, 0L, 0L, 0L, 0L, 0L, 0L (...) 0L, 0L, 0L, 0L, 0L, 0L, 0L]
+
+>>> type(histogram)
+<type 'list'>
+
+>>> len(histogram)
+65536
