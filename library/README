@@ -4,6 +4,7 @@ http://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/picoha
 Event that and for simplicity, here is explained a bit the steps to follow.
 
 1.- udev
+========
 
 add a rulen in the /etc/udev/rules.d directory to respond to the vendor an 
 instrument product:
@@ -13,6 +14,7 @@ This numbering can be saw when having one instrument plugged and lsusb is
 called. After that, reload udev rules or reboot the machine.
 
 2.- locate the original library
+===============================
 
 define an ARCH variable with your bit architecture
 
@@ -31,10 +33,49 @@ and a symlink in: /usr/lib/
 Their howto places the headers in: /usr/local/lib/ph300/
 And that's why of python extension tries to find them there.
 
-Build Python extension:
+3.- cython dependency for the python extension
+==============================================
+
+If you don't have cython available in your system, or the version you have is 
+not compatible, download from http://www.cython.org/release/ one of the 
+released, in this case we've used Cython-0.20.1.tar.gz
+$ wget http://www.cython.org/release/Cython-0.20.1.tar.gz
+$ tar xzf Cython-0.20.1.tar.gz
+$ cd Cython-0.20.1/
+
+To compile it, execute in the :
+$ python setup.py build
+
+To have the cython available, its libraries must be available in the 
+PYTHONPATH and the binary in the PATH:
+$ export PYTHONPATH=`pwd`:$PYTHONPATH
+$ export PATH=`pwd`/bin:$PATH
+
+4.- setuptools dependency
+=========================
+
+In our case Suse11.1 has it as a package, then we didn't proceed like in 
+section 3.
+
+5.- python PicoHarp extension
+=============================
+
+To build Python extension, execute:
+$ python setup.py build
+
+
+
+
+
+
+
+
+
+
+
 - Having the headers in place and the library in there,
 - having the files 'PicoHarp.c' and 'setup.py', execute:
-$ python setup.py install
+
 
 This will left the file:
 - build/lib.(...)/PicoHarp.so
