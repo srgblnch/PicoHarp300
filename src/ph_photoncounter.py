@@ -44,6 +44,7 @@ from types import StringType #used for Exec()
 import pprint #used for Exec()
 import threading
 import time
+import math
 #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.additionnal_import
 
 ##############################################################################
@@ -599,6 +600,28 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Resolution_read
         attr.set_value(self.attr_Resolution_read)
+        
+#------------------------------------------------------------------
+#    Write Resolution attribute
+#------------------------------------------------------------------
+    def write_Resolution(self, attr):
+        self.debug_stream("In " + self.get_name() + ".write_Resolution()")
+        data=attr.get_write_value()
+        self.debug_stream("Attribute value = " + str(data))
+        #----- PROTECTED REGION ID(PH_PhotonCounter.Resolution_write) ENABLED START -----#
+        try:
+            baseResolution = self._instrument.getBaseResolution()
+            #inverse of resolution=baseResolution*(2**binning)
+            binning = int(math.log(data/baseResolution,2))
+            self._instrument.setBinning(binning)
+            self.attr_Binning_read = self._instrument.getBinning()
+            self.attr_Resolution_read = self._instrument.getResolution()
+            self.fireEventsList([['Binning',self.attr_Binning_read],
+                                 ['Resolution',self.attr_Resolution_read]])
+        except Exception, e:
+            self.set_status("Exception with Resolution: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
+        #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.Resolution_write
         
 #------------------------------------------------------------------
 #    Is Resolution attribute allowed
@@ -1307,7 +1330,7 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
         'Resolution':
             [[PyTango.DevDouble,
             PyTango.SCALAR,
-            PyTango.READ],
+            PyTango.READ_WRITE],
             {
                 'label': "Resolution",
                 'unit': "ps",
