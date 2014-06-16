@@ -33,7 +33,8 @@
 from version import MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION,REVISION_VERSION
 import time
 cimport cython
-from libc.stdlib cimport malloc, free
+#from libc.stdlib cimport calloc, free
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from threading import Thread,Event
 import random #used in the simulator
 import time #used in the simulator
@@ -786,14 +787,23 @@ class Instrument(Logger):
         #cdef np.ndarray[np.uint32_t, ndim=1] counts = np.zeros([HISTCHAN],
         #                                                      dtype=np.uint32)
         cdef unsigned int *counts
-        counts = <unsigned int*>malloc(HISTCHAN*cython.sizeof(int))
+        try:
+            #counts = <unsigned int*>malloc(HISTCHAN*cython.sizeof(int))
+            #counts = <unsigned int*>calloc(HISTCHAN,cython.sizeof(int))
+            counts = <unsigned int*>PyMem_Malloc(HISTCHAN*cython.sizeof(int))
+            if not counts:
+                self.debug("Exception in histogram malloc")
+                return [None]*HISTCHAN
+        except Exception,e:
+            self.debug("Exception in histogram malloc: %s"%(e))
+            return [None]*HISTCHAN
         err = PH_GetHistogram(self._devidx,counts,block)
         if err != ERROR_NONE:
             raise IOError("GetHistogram error (%d): %s"
                           %(err,self.interpretError(err)))
         for i in xrange(len(self._counts)):
             self._counts[i] = counts[i]
-        free(counts)
+        PyMem_Free(counts)
         if len(self._counts)>21:
             self.debug("Histogram (block %d): %s (...) %s"
                        %(block,repr(self._counts[:7])[:-1],
