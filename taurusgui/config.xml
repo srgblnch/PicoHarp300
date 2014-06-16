@@ -61,7 +61,8 @@
       <sharedDataRead/>
       <model>bl34/di/PhCt-01/countratech0, 
              bl34/di/PhCt-01/countratech1, 
-             bl34/di/PhCt-01/integralcount</model>
+             bl34/di/PhCt-01/integralcount, 
+             bl34/di/PhCt-01/HistogramMaxValue</model>
     </PanelDescription>
     <PanelDescription>
       <name>Commands</name>
