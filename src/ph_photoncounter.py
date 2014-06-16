@@ -612,7 +612,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         try:
             baseResolution = self._instrument.getBaseResolution()
             #inverse of resolution=baseResolution*(2**binning)
-            binning = int(math.log(data/baseResolution,2))
+            #and round the result to the closest binning
+            binning = int(math.ceil(math.log(data/baseResolution,2)))
             self._instrument.setBinning(binning)
             self.attr_Binning_read = self._instrument.getBinning()
             self.attr_Resolution_read = self._instrument.getResolution()
