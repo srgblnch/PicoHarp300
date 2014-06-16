@@ -9,6 +9,11 @@
       <type xsi:type="pogoDsl:StringType"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </deviceProperties>
+    <deviceProperties name="Simulation" description="Property to configure the device to, instead of use an instrument, simulate it.">
+      <type xsi:type="pogoDsl:BooleanType"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <DefaultPropValue>False</DefaultPropValue>
+    </deviceProperties>
     <commands name="State" description="This command gets the device state (stored in its device_state data member) and returns it to the caller." execMethod="dev_state" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="none">
         <type xsi:type="pogoDsl:VoidType"/>
@@ -151,7 +156,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="ZeroCrossCh0" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:ShortType"/>
@@ -166,7 +170,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="ZeroCrossCh1" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:ShortType"/>
@@ -181,7 +184,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="LevelCh0" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:ShortType"/>
@@ -196,7 +198,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="LevelCh1" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:ShortType"/>
@@ -211,7 +212,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="Resolution" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:DoubleType"/>
@@ -237,7 +237,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="BaseResolution" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:DoubleType"/>
@@ -263,7 +262,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="CountRateCh0" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:IntType"/>
@@ -286,7 +284,6 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
-      <readExcludedStates>RUNNING</readExcludedStates>
     </attributes>
     <attributes name="OverflowStopper" attType="Scalar" rwType="READ_WRITE" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:BooleanType"/>
@@ -301,7 +298,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="OverflowStopperThreshold" attType="Scalar" rwType="READ_WRITE" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:UIntType"/>
@@ -316,7 +312,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="AcquisitionTime" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:DoubleType"/>
@@ -331,7 +326,6 @@
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
-      <writeExcludedStates>RUNNING</writeExcludedStates>
     </attributes>
     <attributes name="Flags" attType="Scalar" rwType="READ" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:ShortType"/>
@@ -351,6 +345,17 @@
       <dataReadyEvent fire="false" libCheckCriteria="true"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="" label="Integration" unit="counts" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+      <readExcludedStates>FAULT</readExcludedStates>
+      <readExcludedStates>INIT</readExcludedStates>
+      <readExcludedStates>OFF</readExcludedStates>
+    </attributes>
+    <attributes name="HistogramMaxValue" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
+      <dataType xsi:type="pogoDsl:IntType"/>
+      <changeEvent fire="false" libCheckCriteria="false"/>
+      <archiveEvent fire="false" libCheckCriteria="false"/>
+      <dataReadyEvent fire="false" libCheckCriteria="true"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <properties description="From read histogram, its maximum value" label="Histogram Maximum Value" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
@@ -379,6 +384,9 @@
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
     <states name="RUNNING" description="Acquisition ongoing.">
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </states>
+    <states name="ALARM" description="Alert that something is not going as expected">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
     <preferences docHome="./doc_html" makefileHome="$(TANGO_HOME)"/>

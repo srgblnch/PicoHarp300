@@ -39,6 +39,7 @@ import sys
 # Add additional import
 #----- PROTECTED REGION ID(PH_PhotonCounter.additionnal_import) ENABLED START -----#
 import PicoHarp
+import numpy as np
 #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.additionnal_import
 
 ##############################################################################
@@ -49,32 +50,115 @@ import PicoHarp
 ## OFF : Instrument discovered, but not yet open communication.
 ## ON : Instrument available.
 ## RUNNING : Acquisition ongoing.
+## ALARM : Alert that something is not going as expected
 ##############################################################################
 
 class PH_PhotonCounter (PyTango.Device_4Impl):
 
 #--------- Add you global variables here --------------------------
 #----- PROTECTED REGION ID(PH_PhotonCounter.global_variables) ENABLED START -----#
+    _important_logs = []
+    #---- Events region
+    def set_state(self, newState):
+        '''Overload of the superclass method to add event 
+           emission functionality.
+        '''
+        if self.get_state() != newState:
+            self.warn_stream("Change state from %s to %s"
+                             %(self.get_state(),newState))
+            PyTango.Device_4Impl.set_state(self, newState)
+            self.push_change_event('State',newState)
+            self.set_status("")
+    def set_status(self, newLine2status,important=False):
+        '''Overload of the superclass method to add the extra feature of
+           the persistent messages added to the status string.
+        '''
+        #self.debug_stream("In set_status()")
+        newStatus = ""#The device is in %s state.\n"%(self.get_state())
+        for importantMsg in self._important_logs:
+            if len(importantMsg) > 0:
+                newStatus = "%s%s\n"%(newStatus,importantMsg)
+        if len(newLine2status) > 0 and \
+           not newLine2status in self._important_logs:
+            newStatus = "%s%s\n"%(newStatus,newLine2status)
+            if important:
+                self._important_logs.append(newLine2status)
+        if len(newStatus) == 0:
+            newStatus = "The device is in %s state.\n"%(self.get_state())
+        oldStatus = self.get_status()
+        if newStatus != oldStatus:
+            PyTango.Device_4Impl.set_status(self, newStatus)
+            self.warn_stream("New status message: %s"
+                              %(repr(self.get_status())))
+            self.push_change_event('Status',newStatus)
+    def clean_status(self):
+        '''With the extra feature of the important logs, this method allows
+           to clean all those logs as a clean interlocks method does.
+        '''
+        self.debug_stream("In clean_status()")
+        self._important_logs = []
+        self.set_status("")
+    def fireEvent(self,attrEventStruct,timestamp=None):
+        '''Method with the procedure to emit an event from one existing 
+           attribute. Minimal needs are the attribute name and the value
+           to emit, but also can be specified the quality and the timestamp
+        '''
+        if timestamp == None:
+            timestamp = time.time()
+        #self.debug_stream("In fireEvent() attribute %s"
+        #                  %(attrEventStruct[0]))
+        if len(attrEventStruct) == 3: #the quality is specified
+            self.push_change_event(attrEventStruct[0],attrEventStruct[1],
+                                   timestamp,
+                                   attrEventStruct[2])
+        else:
+            self.push_change_event(attrEventStruct[0],attrEventStruct[1],
+                                   timestamp,
+                                   PyTango.AttrQuality.ATTR_VALID)
+    
+    def fireEventsList(self,eventsAttrList,log=False):
+        '''Given a set of pair [attr,value] (with an optional third element
+           with the quality) emit events for all of them with the same
+           timestamp.
+        '''
+        if log:
+            self.debug_stream("In fireEventsList():\n%s"
+                              %(''.join("\t%s\n"%line \
+                                        for line in eventsAttrList)))
+        timestamp = time.time()
+        attrNames = []
+        for attrEvent in eventsAttrList:
+            try:
+                self.fireEvent(attrEvent,timestamp)
+                attrNames.append(attrEvent[0])
+            except Exception,e:
+                self.error_stream("In fireEventsList() Exception with "\
+                                  "attribute %s: %s"%(attrEvent[0],e))
+    #---- Done events region
+
+    #---- Instrument connectivity region
     def discover(self):
         self.__discoverer = PicoHarp.Discoverer(debug=True)
         if not self.SerialNumber in self.__discoverer.serials:
             self.debug_stream("Not found %s in %s"
                               %(self.SerialNumber,self.__discoverer.serials))
-            self.set_state(PyTango.DevState.FAULT)
-            return False
+            if not self.Simulation:
+                self.set_state(PyTango.DevState.FAULT)
+                return False
         self.set_state(PyTango.DevState.OFF)
         return True
-    
     def connect(self):
-        self.__devidx = self.__discoverer.search(self.SerialNumber)
-        self.__instrument = PicoHarp.Instrument(self.__devidx,debug=True)
+        if not self.Simulation:
+            self.__devidx = self.__discoverer.search(self.SerialNumber)
+            self.__instrument = PicoHarp.Instrument(self.__devidx,debug=True)
+        else:
+            self.__instrument = PicoHarp.InstrumentSimulator(debug=True)
         self.set_state(PyTango.DevState.ON)
         
     def disconnect(self):
         self.__instrument = None
         self.set_state(PyTango.DevState.OFF)
-        
-        
+    #---- Done instrument connectivity region
 #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.global_variables
 #------------------------------------------------------------------
 #    Device constructor
@@ -118,8 +202,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.attr_AcquisitionTime_read = 0.0
         self.attr_Flags_read = 0
         self.attr_IntegralCount_read = 0
+        self.attr_HistogramMaxValue_read = 0
         self.attr_Histogram_read = [0]
         #----- PROTECTED REGION ID(PH_PhotonCounter.init_device) ENABLED START -----#
+        self.set_change_event('State', True, False)
+        self.set_change_event('Status', True, False)
         self.__discoverer = None
         if not self.discover():
             return
@@ -206,7 +293,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_SyncDivider(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_SyncDivider()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.SyncDivider_read) ENABLED START -----#
-        attr_SyncDivider_read = self.__instrument.getSyncDivider()
+        try:
+            attr_SyncDivider_read = self.__instrument.getSyncDivider()
+        except Exception,e:
+            self.set_status("Exception with SyncDivider: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.SyncDivider_read
         attr.set_value(self.attr_SyncDivider_read)
         
@@ -236,7 +327,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_ZeroCrossCh0(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_ZeroCrossCh0()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.ZeroCrossCh0_read) ENABLED START -----#
-        self.attr_ZeroCrossCh0_read, level = self.__instrument.getInputCFD(0)
+        try:
+            self.attr_ZeroCrossCh0_read, level = self.__instrument.getInputCFD(0)
+        except Exception,e:
+            self.set_status("Exception with ZeroCrossCh0: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.ZeroCrossCh0_read
         attr.set_value(self.attr_ZeroCrossCh0_read)
         
@@ -266,7 +361,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_ZeroCrossCh1(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_ZeroCrossCh1()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.ZeroCrossCh1_read) ENABLED START -----#
-        self.attr_ZeroCrossCh1_read, level = self.__instrument.getInputCFD(1)
+        try:
+            self.attr_ZeroCrossCh1_read, level = self.__instrument.getInputCFD(1)
+        except Exception,e:
+            self.set_status("Exception with ZeroCrossCh1: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.ZeroCrossCh1_read
         attr.set_value(self.attr_ZeroCrossCh1_read)
         
@@ -296,7 +395,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_LevelCh0(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_LevelCh0()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.LevelCh0_read) ENABLED START -----#
-        ZeroCross, self.attr_LevelCh0_read = self.__instrument.getInputCFD(0)
+        try:
+            ZeroCross, self.attr_LevelCh0_read = self.__instrument.getInputCFD(0)
+        except Exception,e:
+            self.set_status("Exception with LevelCh0: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.LevelCh0_read
         attr.set_value(self.attr_LevelCh0_read)
         
@@ -326,7 +429,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_LevelCh1(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_LevelCh1()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.LevelCh1_read) ENABLED START -----#
-        ZeroCross, self.attr_LevelCh1_read = self.__instrument.getInputCFD(1)
+        try:
+            ZeroCross, self.attr_LevelCh1_read = self.__instrument.getInputCFD(1)
+        except Exception,e:
+            self.set_status("Exception with LevelCh1: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.LevelCh1_read
         attr.set_value(self.attr_LevelCh1_read)
         
@@ -356,7 +463,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_Resolution(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_Resolution()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Resolution_read) ENABLED START -----#
-        self.attr_Resolution_read = self.__instrument.getResolution()
+        try:
+            self.attr_Resolution_read = self.__instrument.getResolution()
+        except Exception,e:
+            self.set_status("Exception with Resolution: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Resolution_read
         attr.set_value(self.attr_Resolution_read)
         
@@ -375,7 +486,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_Binning(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_Binning()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Binning_read) ENABLED START -----#
-        self.attr_Binning_read = self.__instrument.getBinning()
+        try:
+            self.attr_Binning_read = self.__instrument.getBinning()
+        except Exception,e:
+            self.set_status("Exception with Binning: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Binning_read
         attr.set_value(self.attr_Binning_read)
         
@@ -405,7 +520,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_BaseResolution(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_BaseResolution()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.BaseResolution_read) ENABLED START -----#
-        self.attr_BaseResolution_read = self.__instrument.getBaseResolution()
+        try:
+            self.attr_BaseResolution_read = self.__instrument.getBaseResolution()
+        except Exception,e:
+            self.set_status("Exception with BaseResolution: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.BaseResolution_read
         attr.set_value(self.attr_BaseResolution_read)
         
@@ -424,7 +543,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_Offset(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_Offset()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Offset_read) ENABLED START -----#
-        self.attr_Offset_read = self.__instrument.getOffset()
+        try:
+            self.attr_Offset_read = self.__instrument.getOffset()
+        except Exception,e:
+            self.set_status("Exception with Offset: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Offset_read
         attr.set_value(self.attr_Offset_read)
         
@@ -454,7 +577,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_CountRateCh0(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_CountRateCh0()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.CountRateCh0_read) ENABLED START -----#
-        self.attr_CountRateCh0_read = self.__instrument.getCountRate(0)
+        try:
+            self.attr_CountRateCh0_read = self.__instrument.getCountRate(0)
+        except Exception,e:
+            self.set_status("Exception with CountRateCh0: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.CountRateCh0_read
         attr.set_value(self.attr_CountRateCh0_read)
         
@@ -473,7 +600,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_CountRateCh1(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_CountRateCh1()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.CountRateCh1_read) ENABLED START -----#
-        self.attr_CountRateCh1_read = self.__instrument.getCountRate(1)
+        try:
+            self.attr_CountRateCh1_read = self.__instrument.getCountRate(1)
+        except Exception,e:
+            self.set_status("Exception with CountRateCh1: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.CountRateCh1_read
         attr.set_value(self.attr_CountRateCh1_read)
         
@@ -484,8 +615,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.debug_stream("In " + self.get_name() + ".is_CountRateCh1_allowed()")
         return not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
-            PyTango.DevState.OFF,
-            PyTango.DevState.RUNNING])
+            PyTango.DevState.OFF])
         
 #------------------------------------------------------------------
 #    Read OverflowStopper attribute
@@ -493,7 +623,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_OverflowStopper(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_OverflowStopper()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.OverflowStopper_read) ENABLED START -----#
-        self.attr_OverflowStopper_read,stopperCt = self.__instrument.getStopOverflow()
+        try:
+            self.attr_OverflowStopper_read,stopperCt = self.__instrument.getStopOverflow()
+        except Exception,e:
+            self.set_status("Exception with StopOverflow: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.OverflowStopper_read
         attr.set_value(self.attr_OverflowStopper_read)
         
@@ -523,7 +657,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_OverflowStopperThreshold(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_OverflowStopperThreshold()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.OverflowStopperThreshold_read) ENABLED START -----#
-        stopper,self.attr_OverflowStopperThreshold_read = self.__instrument.getStopOverflow()
+        try:
+            stopper,self.attr_OverflowStopperThreshold_read = self.__instrument.getStopOverflow()
+        except Exception,e:
+            self.set_status("Exception with StopOverflow Threshold: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.OverflowStopperThreshold_read
         attr.set_value(self.attr_OverflowStopperThreshold_read)
         
@@ -553,7 +691,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_AcquisitionTime(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_AcquisitionTime()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.AcquisitionTime_read) ENABLED START -----#
-        self.attr_AcquisitionTime_read = self.__instrument.getAcquisitionTime()/1000.
+        try:
+            self.attr_AcquisitionTime_read = self.__instrument.getAcquisitionTime()/1000.
+        except Exception,e:
+            self.set_status("Exception with Acquisition Time: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.AcquisitionTime_read
         attr.set_value(self.attr_AcquisitionTime_read)
         
@@ -583,7 +725,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_Flags(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_Flags()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Flags_read) ENABLED START -----#
-        self.attr_Flags_read = self.__instrument.getFlags()
+        try:
+            self.attr_Flags_read = self.__instrument.getFlags()
+        except Exception,e:
+            self.set_status("Exception with Flags: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Flags_read
         attr.set_value(self.attr_Flags_read)
         
@@ -602,7 +748,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def read_IntegralCount(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_IntegralCount()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.IntegralCount_read) ENABLED START -----#
-        self.attr_IntegralCount_read = self.__instrument.integralCount()
+        try:
+            self.attr_IntegralCount_read = self.__instrument.integralCount()
+        except Exception,e:
+            self.set_status("Exception with integralcount: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.IntegralCount_read
         attr.set_value(self.attr_IntegralCount_read)
         
@@ -616,12 +766,35 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             PyTango.DevState.OFF])
         
 #------------------------------------------------------------------
+#    Read HistogramMaxValue attribute
+#------------------------------------------------------------------
+    def read_HistogramMaxValue(self, attr):
+        self.debug_stream("In " + self.get_name() + ".read_HistogramMaxValue()")
+        #----- PROTECTED REGION ID(PH_PhotonCounter.HistogramMaxValue_read) ENABLED START -----#
+        self.attr_HistogramMaxValue_read = np.array(self.attr_Histogram_read).max()
+        #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.HistogramMaxValue_read
+        attr.set_value(self.attr_HistogramMaxValue_read)
+        
+#------------------------------------------------------------------
+#    Is HistogramMaxValue attribute allowed
+#------------------------------------------------------------------
+    def is_HistogramMaxValue_allowed(self, attr):
+        self.debug_stream("In " + self.get_name() + ".is_HistogramMaxValue_allowed()")
+        return not(self.get_state() in [PyTango.DevState.FAULT,
+            PyTango.DevState.INIT,
+            PyTango.DevState.OFF])
+        
+#------------------------------------------------------------------
 #    Read Histogram attribute
 #------------------------------------------------------------------
     def read_Histogram(self, attr):
         self.debug_stream("In " + self.get_name() + ".read_Histogram()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Histogram_read) ENABLED START -----#
-        self.attr_Histogram_read = self.__instrument.getHistogram()
+        try:
+            self.attr_Histogram_read = self.__instrument.getHistogram()
+        except Exception,e:
+            self.set_status("Exception with Histogram: %s"%e, important=True)
+            self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Histogram_read
         attr.set_value(self.attr_Histogram_read)
         
@@ -816,6 +989,10 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             [PyTango.DevString,
             "Serial number of the instrument to contact",
             [] ],
+        'Simulation':
+            [PyTango.DevBoolean,
+            "Property to configure the device to, instead of use an instrument, simulate it.",
+            [False]],
         }
 
 
@@ -1013,6 +1190,14 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             {
                 'label': "Integration",
                 'unit': "counts",
+            } ],
+        'HistogramMaxValue':
+            [[PyTango.DevLong,
+            PyTango.SCALAR,
+            PyTango.READ],
+            {
+                'label': "Histogram Maximum Value",
+                'description': "From read histogram, its maximum value",
             } ],
         'Histogram':
             [[PyTango.DevLong,
