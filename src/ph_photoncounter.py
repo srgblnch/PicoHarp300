@@ -199,10 +199,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         IntegralCount = self._instrument.integralCount()
         histogram = self._instrument.getHistogram()
         HistogramMaxValue = long(np.array(histogram).max())
+        ElapsedMeasTime = self._instrument.getElapsedMeasTime()/1000.
         self.fireEventsList([['CountRateCh0',countRate[0],quality],
                              ['CountRateCh1',countRate[1],quality],
                              ['Flags',flags,quality],
                              ['IntegralCount',IntegralCount,quality],
+                             ['ElapsedMeasTime',ElapsedMeasTime,quality],
                              ['HistogramMaxValue',HistogramMaxValue,quality],
                              ['Histogram',histogram,quality]])
     
@@ -224,7 +226,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.fireAcqusitionEvents(PyTango.AttrQuality.ATTR_CHANGING)
         #launch final events with quality "valid"
         self.fireAcqusitionEvents()
-        self.set_state(endState)
+        warnings = self._instrument.getWarnings()
+        if warnings != 0:
+            self.fireEventsList([['Warnings',self._instrument.getWarningsText(warnings)]])
+            self.set_state(PyTango.DevState.ALARM)
+        else:
+            self.set_state(endState)
 
     def continuousAcquisition(self):
         self.clean_status()
@@ -236,6 +243,10 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.set_state(PyTango.DevState.STANDBY)
         while not self._acquisitionStop.isSet():
             self._doSingleAcq(endState=PyTango.DevState.STANDBY)
+            if self.get_state() == PyTango.DevState.ALARM:
+                #in case of alarms, extend the time between acq to 
+                #allow the alarm to be saw.
+                time.sleep(1)
         self.set_state(PyTango.DevState.ON)
     #---- Done threaded acquisition region
 #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.global_variables
@@ -283,6 +294,9 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.attr_IntegralCount_read = 0
         self.attr_HistogramMaxValue_read = 0
         self.attr_Histogram_read = [0]
+        self.attr_ElapsedMeasTime_read = 0
+        self.attr_Warnings_read = ''
+        self.attr_HardwareDebugInfo_read = ''
         #----- PROTECTED REGION ID(PH_PhotonCounter.init_device) ENABLED START -----#
         self.set_change_event('State', True, False)
         self.set_change_event('Status', True, False)
@@ -311,6 +325,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.set_change_event('IntegralCount', True, False)
         self.set_change_event('HistogramMaxValue', True, False)
         self.set_change_event('Histogram', True, False)
+        self.set_change_event('ElapsedMeasTime', True, False)
+        self.set_change_event('Warnings', True, False)
         self._acquisitionThread = None
         self._acquisitionStop = threading.Event()
         self._acquisitionStop.clear()
@@ -1009,7 +1025,78 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             PyTango.DevState.INIT,
             PyTango.DevState.OFF])
         
+#------------------------------------------------------------------
+#    Read ElapsedMeasTime attribute
+#------------------------------------------------------------------
+    def read_ElapsedMeasTime(self, attr):
+        self.debug_stream("In " + self.get_name() + ".read_ElapsedMeasTime()")
+        #----- PROTECTED REGION ID(PH_PhotonCounter.ElapsedMeasTime_read) ENABLED START -----#
+        try:
+            self.attr_ElapsedMeasTime_read = \
+                                    self._instrument.getElapsedMeasTime()/1000.
+        except Exception,e:
+            self.set_status("Exception with ElapsedMeasTime: %s"%e,
+                            important=True)
+            self.set_state(PyTango.DevState.FAULT)
+        #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.ElapsedMeasTime_read
+        attr.set_value(self.attr_ElapsedMeasTime_read)
+        
+#------------------------------------------------------------------
+#    Is ElapsedMeasTime attribute allowed
+#------------------------------------------------------------------
+    def is_ElapsedMeasTime_allowed(self, attr):
+        self.debug_stream("In " + self.get_name() + ".is_ElapsedMeasTime_allowed()")
+        return not(self.get_state() in [PyTango.DevState.FAULT,
+            PyTango.DevState.INIT,
+            PyTango.DevState.OFF])
 
+#------------------------------------------------------------------
+#    Read Warnings attribute
+#------------------------------------------------------------------
+    def read_Warnings(self, attr):
+        self.debug_stream("In " + self.get_name() + ".read_Warnings()")
+        #----- PROTECTED REGION ID(PH_PhotonCounter.Warnings_read) ENABLED START -----#
+        try:
+            self.attr_Warnings_read = self._instrument.getWarningsText()
+        except Exception,e:
+            self.set_status("Exception with Warnings: %s"%e,
+                            important=True)
+            self.set_state(PyTango.DevState.FAULT)
+        #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.Warnings_read
+        attr.set_value(self.attr_Warnings_read)
+        
+#------------------------------------------------------------------
+#    Is Warnings attribute allowed
+#------------------------------------------------------------------
+    def is_Warnings_allowed(self, attr):
+        self.debug_stream("In " + self.get_name() + ".is_Warnings_allowed()")
+        return not(self.get_state() in [PyTango.DevState.FAULT,
+            PyTango.DevState.INIT,
+            PyTango.DevState.OFF])
+        
+#------------------------------------------------------------------
+#    Read HardwareDebugInfo attribute
+#------------------------------------------------------------------
+    def read_HardwareDebugInfo(self, attr):
+        self.debug_stream("In " + self.get_name() + ".read_HardwareDebugInfo()")
+        #----- PROTECTED REGION ID(PH_PhotonCounter.HardwareDebugInfo_read) ENABLED START -----#
+        try:
+            self.attr_HardwareDebugInfo_read = self._instrument.getHardwareDebugInfo()
+        except Exception,e:
+            self.set_status("Exception with HardwareDebugInfo: %s"%e,
+                            important=True)
+            self.set_state(PyTango.DevState.FAULT)
+        #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.HardwareDebugInfo_read
+        attr.set_value(self.attr_HardwareDebugInfo_read)
+        
+#------------------------------------------------------------------
+#    Is HardwareDebugInfo attribute allowed
+#------------------------------------------------------------------
+    def is_HardwareDebugInfo_allowed(self, attr):
+        self.debug_stream("In " + self.get_name() + ".is_HardwareDebugInfo_allowed()")
+        return not(self.get_state() in [PyTango.DevState.FAULT,
+            PyTango.DevState.INIT,
+            PyTango.DevState.OFF])
 
 
 #------------------------------------------------------------------
@@ -1449,6 +1536,29 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             [[PyTango.DevLong,
             PyTango.SPECTRUM,
             PyTango.READ, 65536]],
+        'ElapsedMeasTime':
+            [[PyTango.DevDouble,
+            PyTango.SCALAR,
+            PyTango.READ],
+            {
+                'label': "Time measuring",
+                'unit': "s",
+            } ],
+        'Warnings':
+            [[PyTango.DevString,
+            PyTango.SCALAR,
+            PyTango.READ],
+            {
+                'label': "Warnings",
+            } ],
+        'HardwareDebugInfo':
+            [[PyTango.DevString,
+            PyTango.SCALAR,
+            PyTango.READ],
+            {
+                'label': "Instrument Debug Info",
+                'Display level': PyTango.DispLevel.EXPERT,
+            } ],
         }
 
 

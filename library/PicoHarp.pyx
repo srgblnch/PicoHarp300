@@ -169,6 +169,10 @@ cdef extern from "phlib.h":
     int PH_CTCStatus(int devidx, int* ctcstatus)
     int PH_GetHistogram(int devidx, unsigned int* chcount, int block)
     int PH_GetFlags(int devidx, int* flags)
+    int PH_GetElapsedMeasTime(int devidx, double* elapsed)
+    int PH_GetWarnings(int devidx, int* warnings)
+    int PH_GetWarningsText(int devidx, char* text, int warnings)
+    int PH_GetHardwareDebugInfo(int devidx, char *debuginfo)
 cdef extern from "phdefin.h":
     int MODE_HIST
     #int MODE_T2
@@ -846,6 +850,39 @@ class Instrument(Logger):
         self._integralCount = integralCount
         self.debug("Integral count = %d"%(self._integralCount))
         return self._integralCount
+    
+    def getElapsedMeasTime(self):
+        cdef double elapsed
+        err = PH_GetElapsedMeasTime(self._devidx,&elapsed)
+        if err != ERROR_NONE:
+            raise IOError("getElapsedMeasTime error (%d): %s"
+                          %(err,self.interpretError(err)))
+        return elapsed
+    
+    def getWarnings(self):
+        self.getCountRates()#this must be called before getWarninings
+        cdef int warnings
+        err = PH_GetWarnings(self._devidx,&warnings)
+        if err != ERROR_NONE:
+            raise IOError("getWarnings error (%d): %s"
+                          %(err,self.interpretError(err)))
+        return warnings
+    def getWarningsText(self,warnings=None):
+        if warnings == None:
+            warnings = self.getWarnings()
+        text = " "*16384
+        err = PH_GetWarningsText(self._devidx,text,warnings)
+        if err != ERROR_NONE:
+            raise IOError("getWarnings error for warning %d (%d): %s"
+                          %(warnings,err,self.interpretError(err)))
+        return __strcut(text)
+    def getHardwareDebugInfo(self):
+        debuginfo = " "*16384
+        err = PH_GetHardwareDebugInfo(self._devidx,debuginfo)
+        if err != ERROR_NONE:
+            raise IOError("getHardwareDebugInfo error (%d): %s"
+                          %(err,self.interpretError(err)))
+        return __strcut(debuginfo)
 
 class InstrumentSimulator(Instrument):
     '''A pure python class that overloads the methods from the real instrument
@@ -1222,6 +1259,7 @@ class InstrumentSimulator(Instrument):
            This must be called even if data collection has finished internally.
         '''
         self.debug("stop measurement")
+        self._startMeasTime = None
         return self
 
     def getHistogram(self,block=None):
@@ -1252,3 +1290,29 @@ class InstrumentSimulator(Instrument):
         self._flags = 176
         self.debug("Flags: %s"%(bin(self._flags)))
         return self._flags
+
+    def getElapsedMeasTime(self):
+        if not self._startMeasTime == None:
+            return time.time() - self._startMeasTime
+        else:
+            return 0
+
+    def getWarnings(self):
+        self.getCountRates()#this must be called before getWarninings
+        return 17
+    def getWarningsText(self,warnings=None):
+        if warnings == None:
+            warnings = self.getWarnings()
+        text = " "*16384
+        err = PH_GetWarningsText(self._devidx,text,warnings)
+        if err != ERROR_NONE:
+            raise IOError("getWarnings error for warning %d (%d): %s"
+                          %(warnings,err,self.interpretError(err)))
+        return __strcut(text)
+    def getHardwareDebugInfo(self):
+        return "FPGA mode:      0\n"\
+               "Device state:     3\n"\
+               "Sync Divider:     %d\n"\
+               "Binning:            %d\n"\
+               "Current Flags = 0x00a4\n"\
+               "Current ErrFlags = 0x0000"%(self._SyncDivider,self._Binning)

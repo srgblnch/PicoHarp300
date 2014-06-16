@@ -48,6 +48,7 @@
              bl34/di/PhCt-01/binning, 
              bl34/di/PhCt-01/offset, 
              bl34/di/PhCt-01/acquisitiontime, 
+             bl34/di/PhCt-01/ElapsedMeasTime,
              bl34/di/PhCt-01/overflowstopper, 
              bl34/di/PhCt-01/overflowstopperthreshold</model>
     </PanelDescription>
