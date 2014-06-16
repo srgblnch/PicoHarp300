@@ -380,7 +380,10 @@
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
     </attributes>
-    <states name="FAULT" description="Decay state when something went wrong.">
+    <states name="ALARM" description="Alert that something is not going as expected, but it's not blocking.">
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </states>
+    <states name="FAULT" description="Decay state when something went wrong. Requires Init().">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
     <states name="INIT" description="Initialization process.">
@@ -389,13 +392,13 @@
     <states name="OFF" description="Instrument discovered, but not yet open communication.">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
-    <states name="ON" description="Instrument available.">
+    <states name="ON" description="Instrument available (or simulated).">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
-    <states name="RUNNING" description="Acquisition ongoing.">
+    <states name="RUNNING" description="An acquisition is going on.">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
-    <states name="ALARM" description="Alert that something is not going as expected">
+    <states name="STANDBY" description="In a continuous acquisition this is the intermediate state.">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
     <preferences docHome="./doc_html" makefileHome="$(TANGO_HOME)"/>
