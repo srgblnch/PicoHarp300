@@ -34,8 +34,10 @@ from version import MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION,REVISION_VERSION
 import time
 cimport cython
 from libc.stdlib cimport malloc, free
-#cimport numpy as np
 from threading import Thread,Event
+import random #used in the simulator
+import time #used in the simulator
+#import numpy as np #used in the simulator
 
 cdef extern from "phlib.h":
     int PH_GetErrorString(char* errstring, int errcode)
@@ -422,11 +424,11 @@ class Instrument(Logger):
         if syncDivider != 0:
             if syncDivider < SYNCDIVMIN:
                 raise ValueError("syncDivider must be above %d"%(SYNCDIVMIN))
-            if syncDivider < SYNCDIVMAX:
+            if syncDivider > SYNCDIVMAX:
                 raise ValueError("syncDivider must be below %d"%(SYNCDIVMAX))
             err = PH_SetSyncDiv(self._devidx,syncDivider)
         else:
-            err = PH_SetSyncDiv(self._devidx,None)
+            err = PH_SetSyncDiv(self._devidx,0)
         if err != ERROR_NONE:
             raise IOError("SetSyncDiv error (%d): %s"
                           %(err,self.interpretError(err)))
@@ -834,3 +836,402 @@ class Instrument(Logger):
         self._integralCount = integralCount
         self.debug("Integral count = %d"%(self._integralCount))
         return self._integralCount
+
+class InstrumentSimulator(Instrument):
+    '''A pure python class that overloads the methods from the real instrument
+      made to allow practical with fake data when no instrument is available.
+    '''
+    def __init__(self,mode=MODE_HIST,divider=8,binning=0,offset=0,
+                 acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
+                 stop=True,stopCount=HISTCHAN-1,debug=False):
+        Logger.__init__(self, debug)
+        if mode != MODE_HIST:
+            raise NotImplementedError("Only histogram mode supported")
+        self._mode = mode
+        self.initialise()
+        self._HW_Model = 'Simulator'
+        self._HW_PartNo = '000000'
+        self._HW_Version = '0.1'
+        self.__getHardwareInfo()
+        self.__calibrate()
+        #configurable parameters
+        self._SyncDivider = divider
+        self._CFDLevel = CFDLevels
+        self._CFDZeroCross = CFDZeroCross
+        self._Binning = binning
+        self._Offset = offset
+        self._acquisitionTime = acqTime#ms
+        self._startMeasTime = None
+        self._block = block
+        self._stop = stop
+        self._stopCount = stopCount
+        #readonly parameters
+        self._Resolution = 0.0
+        self._BaseResolution = 4.0#ps
+        #outputs
+        self._CountRate = [0,0]
+        self._counts = [0]*HISTCHAN
+        self._histograms = [[0L]*HISTCHAN]*8
+        self._flags = 0
+        self._integralCount = 0.0
+        self.prepare()
+        self._thread = None
+        self._acqAbort = Event()
+        self._acqAbort.clear()
+    
+    #Super class methods:
+    #def prepare(self)
+    #def acquire(self,async=False)
+    #def __acquisitionProcedure(self)
+    #def isAsyncAcquisitionDone(self)
+    #def abort(self)
+    #def __model__(self)
+    #def __partnum__(self)
+    #def __version__(self)
+    #def integralCount(self)
+
+    def __del__(self):
+        '''The destructor closes the connection with the instrument.
+        '''
+        self.debug("Instrument connection closed.")
+
+    def initialise(self):
+        '''The instrument initialisation prepares the instrument for one of 
+           the operation modes.
+           But, by now this library only allows histogramming mode
+           and T2 neither T3 are supported yet.
+           If something went wrong an exception is raised with the code and 
+           the meaning of this code.
+        '''
+        return self
+
+    def __getHardwareInfo(self):
+        '''Request to the indetified instrument some information about the 
+           model it is, a partnum code and the firmware version it has. This 
+           firmware version is independent to the library version.
+        '''
+        return (self._HW_Model,self._HW_PartNo,self._HW_Version)
+
+    def __calibrate(self):
+        '''Command the instrument to proceed with it's calibration procedure.
+        '''
+        self.debug("Instrument calibration done.")
+        return self
+
+    def getSyncDivider(self):
+        '''Get from the instrument the programmable divider in front of the 
+           sync input. It's value must be with in SYNCDIVMIN and SYNCDIVMAX or,
+           if it will not be used, set to 0 as the meaning of Null.
+        '''
+        return self._SyncDivider
+    def setSyncDivider(self,syncDivider=None):
+        '''Set to the instrument the value for the programmable divider in 
+           front of the sync input. It's value must be with in SYNCDIVMIN 
+           and SYNCDIVMAX or, if it will not be used, set to 0 as the 
+           meaning of Null.
+           
+           Examples:
+           >>> instrument.setSyncDivider()  #write to the hardware the value 
+                                            #stored in the object.
+           >>> instrument.setSyncDivider(0) #set the SyncDivider to not be used.
+           >>> instrument.setSyncDivider(N) #set a value to the syncDivider.
+        '''
+        if syncDivider == None:
+            syncDivider = self._SyncDivider
+        if syncDivider != 0:
+            if syncDivider < SYNCDIVMIN:
+                raise ValueError("syncDivider must be above %d"%(SYNCDIVMIN))
+            if syncDivider > SYNCDIVMAX:
+                raise ValueError("syncDivider must be below %d"%(SYNCDIVMAX))
+        self._SyncDivider = syncDivider
+        self.debug("SetSyncDiv has been set (%d)"%(self._SyncDivider))
+        return self
+
+    def getInputCFD(self,channel):
+        '''Each of the channels has its Constant Fraction Discriminator (CFD) 
+           configurable, used to extract precise timing information from the 
+           electrical detector pulses that may vary in amplitude.
+           This method is returning a pair (zero cross,level) or the requested 
+           channel where:
+           - zero cross: allows to adapt to the noise from the given signal
+           - level: the discriminator threshold that determines the lower limit
+                    the detector pulse amplitude must pass.
+           Unit: mV
+        '''
+        return (self._CFDZeroCross[channel],self._CFDLevel[channel])
+    def setInputCFD(self,channel,CFDZeroCross=None,CFDLevel=None):
+        '''Each of the channels has its Constant Fraction Discriminator (CFD) 
+           configurable, used to extract precise timing information from the 
+           electrical detector pulses that may vary in amplitude.
+           This method is setting pair (zero cross,level) per channel where:
+           - zero cross: allows to adapt to the noise from the given signal
+           - level: the discriminator threshold that determines the lower limit
+                    the detector pulse amplitude must pass.
+           Unit: mV
+           
+           Examples:
+           >>> instrument.setInputCFD(0) 
+           #Set the pair stored in the object to the instrument for channel 0.
+           >>> instrument.setInputCFD(1,CFDLevel=N) 
+           #Set the discriminator level for channel 1. The zero cross will be
+           #set to what is stored in the object.
+           >>> instrument.setInputCFD(1,CFDLevel=N,CFDZeroCross=M)
+           #Set both, level and zero cross for the specified channel 1.
+        '''
+        if CFDZeroCross == None:
+            CFDZeroCross = self._CFDZeroCross[channel]
+        if CFDLevel == None:
+            CFDLevel = self._CFDLevel[channel]
+        if CFDLevel < DISCRMIN:
+            raise ValueError("CFD levels must be above %d"%(DISCRMIN))
+        if CFDLevel > DISCRMAX:
+            raise ValueError("CFD levels must be below %d"%(DISCRMAX))
+        if CFDZeroCross < ZCMIN:
+            raise ValueError("CFD zero cross must be above %d"%(ZCMIN))
+        if CFDZeroCross > ZCMAX:
+            raise ValueError("CFD zero cross must be below %d"%(ZCMAX))
+        self.debug("setInputCFD has been set for channel %d: "\
+                   "(CFDLevel:%d,CFDZeroCross:%d)"
+                   %(channel,CFDLevel,CFDZeroCross))
+        self._CFDZeroCross[channel] = CFDZeroCross
+        self._CFDLevel[channel] = CFDLevel
+        return self
+
+    def getBinning(self):
+        '''The binning is used to modify the resolution (a read-only parameter)
+           Its value can come from 0 to BINSTEPSMAX and it multiplies the
+           base resolution of 4ps.
+           
+           Formula: resolution = baseResolution * (2^binning)
+        '''
+        return self._Binning
+    def setBinning(self,Binning=None):
+        '''The binning is used to modify the resolution (a read-only parameter)
+           Its value can come from 0 to BINSTEPSMAX and it multiplies the
+           base resolution of 4ps.
+           
+           Formula: resolution = baseResolution * (2^binning)
+        '''
+        if Binning == None:
+            Binning = self._Binning
+        self_Resolution = self._BaseResolution * (2 ** Binning)
+        self._Binning = Binning
+        self.debug("Binning = %d"%(self._Binning))
+        return self
+
+    def getOffset(self):
+        '''With lower sync rates the region of interest of the histogram could 
+           be lie outside the acquisition window. With this value is the time 
+           shifted between the sync frame and the acquisition.
+           With sync rates >5MHz this should be 0 always.
+           Unit: ns
+        '''
+        return self._Offset
+    def setOffset(self,Offset=None):
+        '''With lower sync rates the region of interest of the histogram could 
+           be lie outside the acquisition window. With this value is the time 
+           shifted between the sync frame and the acquisition.
+           With sync rates >5MHz this should be 0 always.
+           Unit: ns
+           
+           Examples:
+           >>> instrument.setOffset()  #write the stored value in the object
+           >>> instrument.setOffset(N) #set it to the instrument and store it 
+                                       #in the object.
+        '''
+        if Offset == None:
+            Offset = self._Offset
+        self._Offset = Offset
+        self.debug("Offset = %d"%(self._Offset))
+        return self
+
+    def getBaseResolution(self):
+        '''The instrument has a resolution that can be adjusted using the 
+           binning. But this method give the very basic value that will be
+           the resolution without binning.
+        '''
+        self.debug("BaseResolution = %g"%(self._BaseResolution))
+        return self._BaseResolution
+
+    def getResolution(self):
+        '''It represents the time per each of the points in the histogram. The 
+           base resolution is 4ps and using the binning this can be set up by
+           binary multiples (8,16,32,...,512ps)
+        '''
+        self.debug("Resolution = %g"%(self._Resolution))
+        return self._Resolution
+    #There is no setter, use the binning.
+    
+    def getCountRate(self,channel):
+        '''For a given channel get the number of counts received per second.
+           It must be passed at least 100ms after initialise() or setSyncDivider()
+           to have a valid reading from this meter.
+           Unit: Mcps (milions of counts per second)
+        '''
+        self._CountRate[channel] = random.randint(9e5,1e6)
+        self.debug("CountRate[%d] = %d"%(channel,self._CountRate[channel]))
+        return self._CountRate[channel]
+    def getCountRates(self,channel=None):
+        '''Get the pair of count rates on both channels.
+           It must be passed at least 100ms after initialise() or setSyncDivider()
+           to have a valid reading from this meter.
+           Unit: Mcps (milions of counts per second)
+        '''
+        if channel == None:
+            channel = [0,1]
+        elif channel in [0,1]:
+            channel = [channel]
+        else:
+            raise IndexError("Channel not well specified.")
+        for i in channel:
+            self.getCountRate(i)
+        return self._CountRate
+
+    def getStopOverflow(self):
+        '''The instrument acquisition can be configured to finish the 
+           acquisition, even the acquisition time didn't finish, when any of 
+           the channels reaches the maximum.
+           This method returns a pair (stop,ct):
+           - stop: boolean, if this feature is active or not
+           - ct: integer defining this maximum to stop
+        '''
+        return (self._stop,self._stopCount)
+    def setStopOverflow(self,stop=None,count=None):
+        '''The instrument acquisition can be configured to finish the 
+           acquisition, even the acquisition time didn't finish, when any of 
+           the channels reaches the maximum.
+           To configure this feature, there are two arguments:
+           - stop: boolean, to set this feature is active or not
+           - ct: integer defining this maximum to stop if it's active.
+           
+           Examples:
+           >>> instrument.setStopOverflow()  #write the stored value in the object
+           >>> instrument.setStopOverflow(0) #disable this feature
+           >>> instrument.setStopOverflow(1,HISTCHAN-1)
+           #enable this feature, but put the roof to the maximum possible.
+        '''
+        if stop == None:
+            stop = self._stop
+        if count == None:
+            count = self._stopCount
+        else:
+            if count < 1:
+                raise ValueError("stop count must be above %d"%(1))
+            elif count > HISTCHAN-1:
+                raise ValueError("stop count must be below %d"%(HISTCHAN-1))
+        self._stop = stop
+        self._stopCount = count
+        self.debug("Overflow stopper set")
+        return self
+
+    def getBlock(self):
+        '''Index of the memory block from the instrument, that will be used 
+           for an acquisition or to get the histogram (in case it's not 
+           specified precisely on any of those two calls).
+        '''
+        return self._block
+    def setBlock(self,block):
+        '''Set the instrument memory block to be used by default when start a 
+           measurement or to get an histogram.
+        '''
+        self._block = block
+        return self
+
+    def clearHistMem(self,block=None):
+        '''Clean old values in an instrument memory block
+           
+           Examples:
+           >>> instrument.clearHistMem()  #set to 0s the default block histogram
+           >>> instrument.clearHistMem(N) #set to 0s the specified block histogram
+        '''
+        if block == None:
+            block = self._block
+        self._histograms[block] = [0L]*HISTCHAN
+        self.debug("Histogram memory (block %d) clean"%(block))
+        return self
+
+    def getAcquisitionTime(self):
+        '''Lapse time during which the instrument will be accumulating counts
+           Unit: ms
+        '''
+        return self._acquisitionTime
+    def setAcquisitionTime(self,AcquisitionTime):
+        '''Set up the time that the instrument will accumulate. An acquisition
+           may take less if there is configured an stop overflow.
+           Unit: ms
+        '''
+        if AcquisitionTime < ACQTMIN:
+            raise ValueError("acq.time must be above %d"%(ACQTMIN))
+        if AcquisitionTime > ACQTMAX:
+            raise ValueError("acq.time must be below %d"%(ACQTMAX))
+        self._acquisitionTime = AcquisitionTime
+        return self
+
+    def startMeas(self,AcquisitionTime=None):
+        '''Call the instrument to start a measurement. Optionally this method 
+           can receive an acquisition time that will overwrite the stored value.
+        '''
+        if AcquisitionTime == None:
+            AcquisitionTime = self._acquisitionTime
+        if AcquisitionTime < ACQTMIN:
+            raise ValueError("acq.time must be above %d"%(ACQTMIN))
+        if AcquisitionTime > ACQTMAX:
+            raise ValueError("acq.time must be below %d"%(ACQTMAX))
+        self._acquisitionTime = AcquisitionTime
+        self._startMeasTime = time.time()
+        self.debug("start measurement")
+        return self
+    
+    def getCounterStatus(self):
+        '''Check with the instrument if a measurement has finished the 
+           acquisition.
+           Return values:
+           - 0:  acquisition still running
+           - >0: acquisition has ended.
+        '''
+        if time.time() >= self._startMeasTime + (self._acquisitionTime/1000.):
+            return 1
+        else:
+            #counts to add
+            counts2add = random.randint(10,1000)
+            while counts2add > 0:
+                pos = random.randint(0,HISTCHAN-1)
+                if self._histograms[self._block][pos] < HISTCHAN:
+                    self._histograms[self._block][pos] += 1
+                    counts2add -= 1
+            return 0
+
+    def stopMeas(self):
+        '''Stops the current measurement.
+           This must be called even if data collection has finished internally.
+        '''
+        self.debug("stop measurement")
+        return self
+
+    def getHistogram(self,block=None):
+        '''Get a 1D array from the memory block by default or the specified in the argument.
+           
+           Examples:
+           >>> instrument.getHistogram()  #Get the histogram from the default block
+           >>> instrument.getHistogram(N) #Get the histogram from the specified block
+        '''
+        if block == None:
+            block = self._block
+        self._count = self._histograms[block]
+        if len(self._counts)>21:
+            self.debug("Histogram (block %d): %s (...) %s"
+                       %(block,repr(self._counts[:7])[:-1],
+                         repr(self._counts[-7:])[1:]))
+        else:
+            self.debug("Histogram (block %d): %s"%(block,self._counts))
+        return self._counts
+
+    def getFlags(self):
+        '''Returns a integer with the bit array flags.
+           FLAG_FIFOFULL     0x0003  //T-modes
+           FLAG_OVERFLOW     0x0040  //Histomode
+           FLAG_SYSERROR     0x0100  //Hardware problem
+        '''
+        self._flags = 176
+        self.debug("Flags: %s"%(bin(self._flags)))
+        return self._flags
