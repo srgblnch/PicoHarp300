@@ -1204,7 +1204,7 @@ class InstrumentSimulator(Instrument):
                         counts2add -= 1
                 except Exception,e:
                     self.debug("Ups, this shouldn't happen in getCounterStatus: %s"%(e))
-            self.getHistogram()
+            #self.getHistogram()
             return 0
 
     def stopMeas(self):

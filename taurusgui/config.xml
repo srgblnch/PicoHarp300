@@ -74,6 +74,17 @@
       <sharedDataRead/>
       <model>bl34/di/PhCt-01</model>
     </PanelDescription>
+    <PanelDescription>
+      <name>Status</name>
+      <classname>TaurusForm</classname>
+      <modulename/>
+      <widgetname/>
+      <floating>True</floating>
+      <sharedDataWrite/>
+      <sharedDataRead/>
+      <model>bl34/di/PhCt-01/state, 
+             bl34/di/PhCt-01/status</model>
+    </PanelDescription>
   </PanelDescriptions>
   <MONITOR/>
 </taurusgui_config>
