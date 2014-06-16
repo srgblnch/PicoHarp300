@@ -144,16 +144,24 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def _debugAttributeEvent(self,attrEventStruct):
         if type(attrEventStruct[1]) == list and len(attrEventStruct[1])>21:
             if len(attrEventStruct) == 3:
-                return '[%s,%s (...) %s,%s'%(attrEventStruct[0],
+                return '[\'%s\',%s (...) %s (len %d),%s]'%(attrEventStruct[0],
                                              repr(attrEventStruct[1][:7])[:-1],
                                              repr(attrEventStruct[1][-7:])[1:],
+                                             len(attrEventStruct[1]),
                                              attrEventStruct[2])
             else:
-                return '[%s,%s (...) %s,%s'%(attrEventStruct[0],
+                return '[\'%s\',%s (...) %s (len %d)]'%(attrEventStruct[0],
                                              repr(attrEventStruct[1][:7])[:-1],
-                                             repr(attrEventStruct[1][-7:])[1:])
+                                             repr(attrEventStruct[1][-7:])[1:],
+                                             len(attrEventStruct[1]))
         else:
-            return '%s'%(attrEventStruct)
+            if len(attrEventStruct) == 3:
+                return '[\'%s\',%s,%s]'%(attrEventStruct[0],
+                                         repr(attrEventStruct[1]),
+                                         attrEventStruct[2])
+            else:
+                return '[\'%s\',%s]'%(attrEventStruct[0],
+                                         repr(attrEventStruct[1]))
     #---- Done events region
 
     #---- Instrument connectivity region
@@ -190,7 +198,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         flags = self._instrument.getFlags()
         IntegralCount = self._instrument.integralCount()
         histogram = self._instrument.getHistogram()
-        HistogramMaxValue = np.array(histogram).max()
+        HistogramMaxValue = long(np.array(histogram).max())
         self.fireEventsList([['CountRateCh0',countRate[0],quality],
                              ['CountRateCh1',countRate[1],quality],
                              ['Flags',flags,quality],
@@ -278,6 +286,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         #----- PROTECTED REGION ID(PH_PhotonCounter.init_device) ENABLED START -----#
         self.set_change_event('State', True, False)
         self.set_change_event('Status', True, False)
+        self.set_state(PyTango.DevState.INIT)
         #RW attribute with event emission when write.
         self.set_change_event('SyncDivider', True, False)
         self.set_change_event('ZeroCrossCh0', True, False)
@@ -414,8 +423,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.fireEventsList([['SyncDivider',
                                   self._instrument.getSyncDivider()]])
         except Exception,e:
-            self.set_status("Exception with SyncDivider: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with SyncDivider: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.SyncDivider_write
         
 #------------------------------------------------------------------
@@ -454,8 +463,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.attr_ZeroCrossCh0_read, level = self._instrument.getInputCFD(0)
             self.fireEventsList([['ZeroCrossCh0',self.attr_ZeroCrossCh0_read]])
         except Exception, e:
-            self.set_status("Exception with ZeroCrossCh0: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_strem("Exception with ZeroCrossCh0: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.ZeroCrossCh0_write
         
 #------------------------------------------------------------------
@@ -494,8 +503,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.attr_ZeroCrossCh1_read, level = self._instrument.getInputCFD(1)
             self.fireEventsList([['ZeroCrossCh1',self.attr_ZeroCrossCh1_read]])
         except Exception, e:
-            self.set_status("Exception with ZeroCrossCh1: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with ZeroCrossCh1: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.ZeroCrossCh1_write
         
 #------------------------------------------------------------------
@@ -534,8 +543,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             ZeroCross, self.attr_LevelCh0_read = self._instrument.getInputCFD(0)
             self.fireEventsList([['LevelCh0',self.attr_LevelCh0_read]])
         except Exception, e:
-            self.set_status("Exception with LevelCh0: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with LevelCh0: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.LevelCh0_write
         
 #------------------------------------------------------------------
@@ -574,8 +583,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             ZeroCross, self.attr_LevelCh1_read = self._instrument.getInputCFD(1)
             self.fireEventsList([['LevelCh1',self.attr_LevelCh1_read]])
         except Exception, e:
-            self.set_status("Exception with LevelCh1: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with LevelCh1: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.LevelCh1_write
         
 #------------------------------------------------------------------
@@ -611,6 +620,9 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         #----- PROTECTED REGION ID(PH_PhotonCounter.Resolution_write) ENABLED START -----#
         try:
             baseResolution = self._instrument.getBaseResolution()
+            if data<baseResolution:
+                raise Exception("Resolution cannot go below the base "\
+                               "resolution (%f)"%baseResolution)
             #inverse of resolution=baseResolution*(2**binning)
             #and round the result to the closest binning
             binning = int(math.ceil(math.log(data/baseResolution,2)))
@@ -620,8 +632,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.fireEventsList([['Binning',self.attr_Binning_read],
                                  ['Resolution',self.attr_Resolution_read]])
         except Exception, e:
-            self.set_status("Exception with Resolution: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with Resolution: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.Resolution_write
         
 #------------------------------------------------------------------
@@ -662,8 +674,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.fireEventsList([['Binning',self.attr_Binning_read],
                                  ['Resolution',self.attr_Resolution_read]])
         except Exception, e:
-            self.set_status("Exception with Binning: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with Binning: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Binning_write
         
 #------------------------------------------------------------------
@@ -727,8 +739,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.attr_Offset_read = self._instrument.getOffset()
             self.fireEventsList([['Offset',self.attr_Binning_read]])
         except Exception, e:
-            self.set_status("Exception with Offset: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with Offset: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Offset_write
         
 #------------------------------------------------------------------
@@ -813,8 +825,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.attr_OverflowStopper_read,stopperCt = self._instrument.getStopOverflow()
             self.fireEventsList([['OverflowStopper',self.attr_OverflowStopper_read]])
         except Exception, e:
-            self.set_status("Exception with OverflowStopper: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with OverflowStopper: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.OverflowStopper_write
         
 #------------------------------------------------------------------
@@ -853,8 +865,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             stopper,self.attr_OverflowStopperThreshold_read = self._instrument.getStopOverflow()
             self.fireEventsList([['OverflowStopperThreshold',self.attr_OverflowStopperThreshold_read]])
         except Exception, e:
-            self.set_status("Exception with OverflowStopperThreshold: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with OverflowStopperThreshold: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.OverflowStopperThreshold_write
         
 #------------------------------------------------------------------
@@ -893,8 +905,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.fireEventsList([['AcquisitionTime',
                                   self._instrument.getAcquisitionTime()/1000.]])
         except Exception, e:
-            self.set_status("Exception with AcquisitionTime: %s"%e, important=True)
-            self.set_state(PyTango.DevState.FAULT)
+            self.error_stream("Exception with AcquisitionTime: %s"%e)
+            raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.AcquisitionTime_write
         
 #------------------------------------------------------------------
@@ -959,7 +971,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.debug_stream("In " + self.get_name() + ".read_HistogramMaxValue()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.HistogramMaxValue_read) ENABLED START -----#
         try:
-            self.attr_HistogramMaxValue_read = np.array(self._instrument.getHistogram()).max()
+            self.attr_HistogramMaxValue_read = long(np.array(self._instrument.getHistogram()).max())
         except Exceptio,e:
             self.error_stream("In read_HistogramMaxValue() Exception: %s"%e)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.HistogramMaxValue_read
@@ -1363,7 +1375,7 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
                 'label': "Offset",
                 'unit': "ns",
                 'description': "Delay the acquisition window relatively to the sync frame.",
-                'Memorized':"true"
+                #'Memorized':"true"
             } ],
         'CountRateCh0':
             [[PyTango.DevLong,
@@ -1399,7 +1411,7 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             {
                 'label': "Overflow threshold",
                 'Display level': PyTango.DispLevel.EXPERT,
-                'Memorized':"true"
+                #'Memorized':"true"
             } ],
         'AcquisitionTime':
             [[PyTango.DevDouble,
