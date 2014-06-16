@@ -1014,9 +1014,9 @@ class InstrumentSimulator(Instrument):
         '''
         if Binning == None:
             Binning = self._Binning
-        self_Resolution = self._BaseResolution * (2 ** Binning)
+        self._Resolution = self._BaseResolution * (2 ** Binning)
         self._Binning = Binning
-        self.debug("Binning = %d"%(self._Binning))
+        self.debug("Binning = %d (Resolution = %g)"%(self._Binning,self._Resolution))
         return self
 
     def getOffset(self):
@@ -1190,15 +1190,21 @@ class InstrumentSimulator(Instrument):
            - >0: acquisition has ended.
         '''
         if time.time() >= self._startMeasTime + (self._acquisitionTime/1000.):
+            self.getHistogram()
             return 1
         else:
             #counts to add
-            counts2add = random.randint(10,1000)
+            counts2add = random.randint(1000,10000)
+            #self.debug("Add %d counts"%(counts2add))
             while counts2add > 0:
                 pos = random.randint(0,HISTCHAN-1)
-                if self._histograms[self._block][pos] < HISTCHAN:
-                    self._histograms[self._block][pos] += 1
-                    counts2add -= 1
+                try:
+                    if self._histograms[self._block][pos] < HISTCHAN:
+                        self._histograms[self._block][pos] += 1
+                        counts2add -= 1
+                except Exception,e:
+                    self.debug("Ups, this shouldn't happen in getCounterStatus: %s"%(e))
+            self.getHistogram()
             return 0
 
     def stopMeas(self):
@@ -1217,8 +1223,9 @@ class InstrumentSimulator(Instrument):
         '''
         if block == None:
             block = self._block
-        self._count = self._histograms[block]
+        self._counts = self._histograms[block]
         if len(self._counts)>21:
+            #Debug string, but cut the data when it's too long
             self.debug("Histogram (block %d): %s (...) %s"
                        %(block,repr(self._counts[:7])[:-1],
                          repr(self._counts[-7:])[1:]))
