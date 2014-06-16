@@ -35,6 +35,7 @@ import time
 cimport cython
 from libc.stdlib cimport malloc, free
 #cimport numpy as np
+from threading import Thread,Event
 
 cdef extern from "phlib.h":
     int PH_GetErrorString(char* errstring, int errcode)
@@ -121,6 +122,7 @@ class Discoverer(Logger):
                 #Errorstring = " "*40
                 #PH_GetErrorString(Errorstring, err)
                 self.debug("  %1d        %s"%(i,self.interpretError(err)))
+        return self
 
     @property
     def count(self):
@@ -237,6 +239,9 @@ class Instrument(Logger):
         self._flags = 0
         self._integralCount = 0.0
         self.prepare()
+        self._thread = None
+        self._acqAbort = Event()
+        self._acqAbort.clear()
 
     def prepare(self):
         '''This method is called in the object construction but is necessary 
@@ -254,19 +259,47 @@ class Instrument(Logger):
         #for valid new count rate readings.
         time.sleep(0.2)#200ms
         self.setStopOverflow()
+        return self
 
-    def acquire(self):
-        '''This method does an acquisition bounded by the settings previously
-           set up (or in the constructor on changed by the setters).
+    def acquire(self,async=False):
+        '''Perform an acquisition in synchronous mode if it's not specified to
+           be asynchronous.
+           
+           Examples:
+           >>> instrument.acquire()           #synchronous acquisition
+           >>> instrument.acquire(async=True) #asynchronous acquisition
         '''
         #TODO: check if this should be asynchronous to have the possibility to 
         #      see the histogram evolving during the acquisition.
+        if self._thread != None and self._thread.isAlive():
+            self.debug("Asynchronous acquisition in progress, please use "\
+                       "isAsyncAcquisitionDone() to know when it's finished.")
+            return False
+        if not async:
+            self.debug("Synchronous acquisition, return when finished")
+            self.__acquisitionProcedure()
+            return True
+        else:
+            self.debug("Asynchronous acquisition, check "\
+                       "isAsyncAcquisitionDone() to know it's finished")
+            self._thread = Thread(target=self.__acquisitionProcedure)
+            self._thread.start()
+            return True
+
+    def __acquisitionProcedure(self):
+        '''This method does an acquisition bounded by the settings previously
+           set up (or in the constructor on changed by the setters).
+        '''
         self.clearHistMem()
         self.getCountRates()
         self.startMeas()
+        time.sleep(self._acquisitionTime/1e6)
         waitloop = 0
-        while(self.getCounterStatus()==0):
+        self._acqAbort.clear()
+        while(self.getCounterStatus()==0 and not self._acqAbort.isSet()):
             waitloop += 1
+            time.sleep(self._acquisitionTime/1e6)
+            #acqTime from ms to seconds and divide by another thousand.
         self.stopMeas()
         self.getHistogram()
         self.getFlags()
@@ -275,6 +308,27 @@ class Instrument(Logger):
                    %(waitloop,self._integralCount))
         if (self._flags&FLAG_OVERFLOW):
             self.debug("Overflow!")
+            return False
+        if self._acqAbort.isSet():
+            self.debug("acquisition aborted!")
+            return False
+        return True
+        
+
+    def isAsyncAcquisitionDone(self):
+        '''When an acquisition has been launched in asynchronous mode, this 
+           method with report if the acquisition has finished.
+        '''
+        return not self._thread.isAlive()
+
+    def abort(self):
+        '''During an asynchronous acquisition, the way to stop a measurement 
+           is call this method.
+        '''
+        if self._thread == None or not self._thread.isAlive():
+            return False
+        self._acqAbort.set()
+        return True
 
     def __del__(self):
         '''The destructor closes the connection with the instrument.
@@ -296,6 +350,7 @@ class Instrument(Logger):
         if err != ERROR_NONE:
             raise IOError("Init error (%d): %s"%(err,self.interpretError(err)))
         self.debug("Instrument initialised.")
+        return self
 
     def __getHardwareInfo(self):
         '''Request to the indetified instrument some information about the 
@@ -323,6 +378,7 @@ class Instrument(Logger):
             raise IOError("Calibration error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("Instrument calibration done.")
+        return self
 
     @property
     def __model__(self):
@@ -376,6 +432,7 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         self._SyncDivider = syncDivider
         self.debug("SetSyncDiv has been set (%d)"%(self._SyncDivider))
+        return self
     
     @property
     def _DISCRMIN(self):
@@ -442,6 +499,7 @@ class Instrument(Logger):
                    %(channel,CFDLevel,CFDZeroCross))
         self._CFDZeroCross[channel] = CFDZeroCross
         self._CFDLevel[channel] = CFDLevel
+        return self
 
     @property
     def _BINSTEPSMAX(self):
@@ -470,6 +528,7 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         self._Binning = Binning
         self.debug("Binning = %d"%(self._Binning))
+        return self
         
     @property
     def _OFFSETMIN(self):
@@ -503,6 +562,7 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         self._Offset = Offset
         self.debug("Offset = %d"%(self._Offset))
+        return self
 
     def getBaseResolution(self):
         '''The instrument has a resolution that can be adjusted using the 
@@ -606,6 +666,7 @@ class Instrument(Logger):
         self._stop = stop
         self._stopCount = count
         self.debug("Overflow stopper set")
+        return self
 
     @property
     def _BLOCKMIN(self):
@@ -625,6 +686,7 @@ class Instrument(Logger):
            measurement or to get an histogram.
         '''
         self._block = block
+        return self
 
     def clearHistMem(self,block=None):
         '''Clean old values in an instrument memory block
@@ -640,6 +702,7 @@ class Instrument(Logger):
             raise IOError("ClearHistMem error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("Histogram memory (block %d) clean"%(block))
+        return self
 
     @property
     def _ACQTMIN(self):
@@ -650,17 +713,20 @@ class Instrument(Logger):
 
     def getAcquisitionTime(self):
         '''Lapse time during which the instrument will be accumulating counts
+           Unit: ms
         '''
         return self._acquisitionTime
     def setAcquisitionTime(self,AcquisitionTime):
         '''Set up the time that the instrument will accumulate. An acquisition
            may take less if there is configured an stop overflow.
+           Unit: ms
         '''
         if AcquisitionTime < ACQTMIN:
             raise ValueError("acq.time must be above %d"%(ACQTMIN))
         if AcquisitionTime > ACQTMAX:
             raise ValueError("acq.time must be below %d"%(ACQTMAX))
         self._acquisitionTime = AcquisitionTime
+        return self
 
     def startMeas(self,AcquisitionTime=None):
         '''Call the instrument to start a measurement. Optionally this method 
@@ -678,6 +744,7 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         self._acquisitionTime = AcquisitionTime
         self.debug("start measurement")
+        return self
     
     def getCounterStatus(self):
         '''Check with the instrument if a measurement has finished the 
@@ -703,6 +770,7 @@ class Instrument(Logger):
             raise IOError("StopMeas error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("stop measurement")
+        return self
 
     def getHistogram(self,block=None):
         '''Get a 1D array from the memory block by default or the specified in the argument.
