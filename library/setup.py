@@ -61,6 +61,7 @@ configuration = {'name':'PicoHarp',
                  'version':'%d.%d.%d.%d'
                             %(MAJOR_VERSION,MINOR_VERSION,
                               BUILD_VERSION,REVISION_VERSION),
+                 'license':'LGPLv3+',
                  'description': "TODO: pending",
                  'long_description':'''TODO: Long description pending''',
                  'author':"Sergi Blanch-Torn\'e",
