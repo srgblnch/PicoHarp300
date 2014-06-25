@@ -214,7 +214,7 @@ class Instrument(Logger):
        To close the connection with the instrument to free it, it's necessary
        to call the destructor.
     '''
-    def __init__(self,devidx,mode=MODE_HIST,divider=8,binning=0,offset=0,
+    def __init__(self,devidx,mode=MODE_HIST,divider=1,binning=0,offset=0,
                  acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  stop=True,stopCount=HISTCHAN-1,debug=False):
         Logger.__init__(self, debug)
@@ -888,7 +888,7 @@ class InstrumentSimulator(Instrument):
     '''A pure python class that overloads the methods from the real instrument
       made to allow practical with fake data when no instrument is available.
     '''
-    def __init__(self,mode=MODE_HIST,divider=8,binning=0,offset=0,
+    def __init__(self,mode=MODE_HIST,divider=1,binning=0,offset=0,
                  acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  stop=True,stopCount=HISTCHAN-1,debug=False):
         Logger.__init__(self, debug)
