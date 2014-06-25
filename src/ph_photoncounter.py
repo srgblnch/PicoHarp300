@@ -188,6 +188,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                              ['BaseResolution',self._instrument.getBaseResolution()]])
         
     def disconnect(self):
+        del self._instrument
         self._instrument = None
         self.set_state(PyTango.DevState.OFF)
     #---- Done instrument connectivity region
@@ -215,23 +216,30 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._acquisitionThread.start()
         
     def _doSingleAcq(self,endState=PyTango.DevState.ON):
-        self.set_state(PyTango.DevState.RUNNING)
-        self._instrument.acquire(async=True)
-        while not self._instrument.isAsyncAcquisitionDone():
-            if self._acquisitionStop.isSet():
-                self._instrument.abort()
-                break
-            time.sleep(0.1)
-            #launch events with "changing" quality
-            self.fireAcqusitionEvents(PyTango.AttrQuality.ATTR_CHANGING)
-        #launch final events with quality "valid"
-        self.fireAcqusitionEvents()
-        warnings = self._instrument.getWarnings()
-        if warnings != 0:
-            self.fireEventsList([['Warnings',self._instrument.getWarningsText(warnings)]])
-            self.set_state(PyTango.DevState.ALARM)
-        else:
-            self.set_state(endState)
+        try:
+            self.set_state(PyTango.DevState.RUNNING)
+            self._instrument.acquire(async=True)
+            while not self._instrument.isAsyncAcquisitionDone():
+                if self._acquisitionStop.isSet():
+                    self._instrument.abort()
+                    break
+                time.sleep(0.1)
+                #launch events with "changing" quality
+                self.fireAcqusitionEvents(PyTango.AttrQuality.ATTR_CHANGING)
+            #launch final events with quality "valid"
+            self.fireAcqusitionEvents()
+            warnings = self._instrument.getWarnings()
+            if warnings != 0:
+                self.fireEventsList([['Warnings',self._instrument.getWarningsText(warnings)]])
+                self.set_state(PyTango.DevState.ALARM)
+            else:
+                self.set_state(endState)
+        except Exception,e:
+            msg = "Acquisition exception: %s"%(e)
+            self.error_stream(msg)
+            self.set_state(PyTango.DevState.FAULT)
+            self.set_status(msg)
+            self._acquisitionStop.set()
 
     def continuousAcquisition(self):
         self.clean_status()
@@ -247,7 +255,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 #in case of alarms, extend the time between acq to 
                 #allow the alarm to be saw.
                 time.sleep(1)
-        self.set_state(PyTango.DevState.ON)
+        if self.get_state() == PyTango.DevState.FAULT:
+            self.set_state(PyTango.DevState.ON)
     #---- Done threaded acquisition region
 #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.global_variables
 #------------------------------------------------------------------
@@ -264,7 +273,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def delete_device(self):
         self.debug_stream("In " + self.get_name() + ".delete_device()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.delete_device) ENABLED START -----#
-        
+        self.disconnect()
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.delete_device
 
 #------------------------------------------------------------------
@@ -333,10 +342,10 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._locals = { 'self' : self }
         self._globals = globals()
         self._discoverer = None
-        if not self.discover():
-            return
         self._devidx = None
         self._instrument = None
+        if not self.discover():
+            return
         self.connect()
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.init_device
 
