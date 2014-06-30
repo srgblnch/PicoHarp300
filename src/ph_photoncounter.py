@@ -168,10 +168,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def discover(self):
         self._discoverer = PicoHarp.Discoverer(debug=True)
         if not self.SerialNumber in self._discoverer.serials:
-            self.debug_stream("Not found %s in %s"
-                              %(self.SerialNumber,self._discoverer.serials))
+            msg = "Not found serial %s in list %s"\
+                  %(self.SerialNumber,self._discoverer.serials)
+            self.debug_stream(msg)
             if not self.Simulation:
                 self.set_state(PyTango.DevState.FAULT)
+                self.set_status(msg)
                 return False
         self.set_state(PyTango.DevState.OFF)
         return True
@@ -488,7 +490,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.attr_ZeroCrossCh0_read, level = self._instrument.getInputCFD(0)
             self.fireEventsList([['ZeroCrossCh0',self.attr_ZeroCrossCh0_read]])
         except Exception, e:
-            self.error_strem("Exception with ZeroCrossCh0: %s"%e)
+            self.error_stream("Exception with ZeroCrossCh0: %s"%e)
             raise e
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.ZeroCrossCh0_write
         
@@ -762,7 +764,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         try:
             self._instrument.setOffset(data)
             self.attr_Offset_read = self._instrument.getOffset()
-            self.fireEventsList([['Offset',self.attr_Binning_read]])
+            self.fireEventsList([['Offset',self.attr_Offset_read]])
         except Exception, e:
             self.error_stream("Exception with Offset: %s"%e)
             raise e
