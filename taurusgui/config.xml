@@ -67,8 +67,8 @@
     </PanelDescription>
     <PanelDescription>
       <name>Commands</name>
-      <classname>TaurusCommandsForm</classname>
-      <modulename/>
+      <classname>PhCtCommands</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>False</floating>
       <sharedDataWrite/>
