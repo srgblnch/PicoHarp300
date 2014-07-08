@@ -32,3 +32,56 @@ class PhCtCommands(TaurusCommandsForm):
                                                        'Start','Stop']]
         self.setViewFilters(commandsFilterList)
 
+from taurus.qt.qtgui.panel import TaurusForm
+
+class PhCtForm(TaurusForm):
+    def __init__(self, parent = None,
+                 formWidget = None,
+                 buttons = None,
+                 withButtons = True, 
+                 designMode = False):
+        TaurusForm.__init__(self,parent,formWidget,buttons,
+                            withButtons,designMode)
+        self._PhCtModel = ""
+        
+    def getModel(self):
+        return self._PhCtModel
+    def setModel(self,model):
+        attrList = ["%s/%s"%(model,attrName) for attrName in self._attributes]
+        TaurusForm.setModel(attrList)
+        self._PhCtModel = model
+
+class AcquisitionForm(PhCtForm):
+    _attributes = ['resolution','binning','offset',
+                   'acquisitiontime','ElapsedMeasTime',
+                   'overflowstopper','overflowstopperthreshold']
+
+class Channel0Form(PhCtForm):
+    _attributes = ['zerocrossch0','levelch0','syncdivider']
+
+class Channel1Form(PhCtForm):
+    _attributes = ['zerocrossch1','levelch1']
+
+class MonitorForm(PhCtForm):
+    _attributes = ['countratech0','countratech1',
+                   'integralcount','HistogramMaxValue']
+
+class StateForm(PhCtForm):
+    _attributes = ['State','Status']
+
+from taurus.qt.qtgui.plot import TaurusPlot
+
+class HistogramPlot(TaurusPlot):
+    def __init__(self, parent=None, designMode=False):
+        TaurusPlot.__init__(self, parent, designMode)
+        self._curveName = None
+
+    def getModel(self):
+        return TaurusPlot.getModel(self).rsplit('/',1)[0]
+    def setModel(self,model):
+        #TODO: validate the model is a device with an attribute 'histogram'
+        TaurusPlot.setModel(self, model+'/histogram')
+        curveName = TaurusForm.getCurveNames()[0]
+        self.info("Curve call: %s"%(curveName))
+        self._histogramCurve = TaurusForm.getCurve(curveName)
+        
