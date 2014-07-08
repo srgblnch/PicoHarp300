@@ -1301,14 +1301,7 @@ class InstrumentSimulator(Instrument):
         self.getCountRates()#this must be called before getWarninings
         return 17
     def getWarningsText(self,warnings=None):
-        if warnings == None:
-            warnings = self.getWarnings()
-        text = " "*16384
-        err = PH_GetWarningsText(self._devidx,text,warnings)
-        if err != ERROR_NONE:
-            raise IOError("getWarnings error for warning %d (%d): %s"
-                          %(warnings,err,self.interpretError(err)))
-        return __strcut(text)
+        return ""
     def getHardwareDebugInfo(self):
         return "FPGA mode:      0\n"\
                "Device state:     3\n"\
