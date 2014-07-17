@@ -56,40 +56,74 @@ class PhCtForm(TaurusForm):
         TaurusForm.setModel(attrList)
         self._PhCtModel = model
 
-class AcquisitionForm(PhCtForm):
-    _attributes = ['resolution','binning','offset',
-                   'acquisitiontime','ElapsedMeasTime',
-                   'overflowstopper','overflowstopperthreshold']
+AcquisitionForm = TaurusForm
 
-class Channel0Form(PhCtForm):
-    _attributes = ['zerocrossch0','levelch0','syncdivider']
+#class AcquisitionForm(PhCtForm):
+#    _attributes = ['resolution','binning','offset',
+#                   'acquisitiontime','ElapsedMeasTime',
+#                   'overflowstopper','overflowstopperthreshold']
 
-class Channel1Form(PhCtForm):
-    _attributes = ['zerocrossch1','levelch1']
+Channel0Form = TaurusForm
 
-class MonitorForm(PhCtForm):
-    _attributes = ['countratech0','countratech1',
-                   'integralcount','HistogramMaxValue']
+#class Channel0Form(PhCtForm):
+#    _attributes = ['zerocrossch0','levelch0','syncdivider']
 
-class StateForm(PhCtForm):
-    _attributes = ['State','Status']
+Channel1Form = TaurusForm
+
+#class Channel1Form(PhCtForm):
+#    _attributes = ['zerocrossch1','levelch1']
+
+MonitorForm = TaurusForm
+
+#class MonitorForm(PhCtForm):
+#    _attributes = ['countratech0','countratech1',
+#                   'integralcount','HistogramMaxValue']
+
+StateForm = TaurusForm
+
+#class StateForm(PhCtForm):
+#    _attributes = ['State','Status']
+
+WargningForm = TaurusForm
+
+#class WargningForm(PhCtForm):
+#    _attributes = ['Warnings']
 
 from taurus.qt.qtgui.plot import TaurusPlot
 
-class HistogramPlot(TaurusPlot):
-    def __init__(self, parent=None, designMode=False):
-        TaurusPlot.__init__(self, parent, designMode)
-        self._curveName = None
-        #TODO: XAxis related with the instrument resolution
-        #TODO: Fix ranges on X and Y [0:65535]
-        #TODO: can be play the colour of this curve to show quality?
+HistogramPlot = TaurusPlot
 
-    def getModel(self):
-        return TaurusPlot.getModel(self).rsplit('/',1)[0]
-    def setModel(self,model):
-        #TODO: validate the model is a device with an attribute 'histogram'
-        TaurusPlot.setModel(self, model+'/histogram')
-        curveName = TaurusForm.getCurveNames()[0]
-        self.info("Curve call: %s"%(curveName))
-        self._histogramCurve = TaurusForm.getCurve(curveName)
+#class HistogramPlot(TaurusPlot):
+#    pass
+#    def __init__(self, parent=None, designMode=False):
+#        TaurusPlot.__init__(self, parent, designMode)
+#        #self._curveName = None
+#        #TODO: XAxis related with the instrument resolution
+#        #TODO: Fix ranges on X and Y [0:65535]
+#        #TODO: can be play the colour of this curve to show quality?
+
+#    def getModel(self):
+#        #TODO: robusteness
+#        superClassModel = TaurusPlot.getModel(self)
+#        if type(superClassModel) == list and len(superClassModel) == 1:
+#            attrName = superClassModel[0]
+#            devName = attrName.rsplit('/',1)[0]
+#            return devName
+#        return ""
+#    def setModel(self,model):
+#        self.info("HistogramPlot model = %s"%(model))
+#        #TODO: validate the model is a device with an attribute 'histogram'
+#        if type(model) == list and len(model) == 1:
+#            superClassModel = ['%s/histogram'%(model[0])]
+#        elif type(model) == str:
+#            superClassModel = ['%s/histogram'%(model)]
+#        else:
+#            self.error("HistogramPlot wrong model type set! %s"%(type(model)))
+#            return
+#        self.info("HistogramPlot superClassModel = %s"%(superClassModel))
+#        TaurusPlot.setModel(self,superClassModel)
+#        
+#        curveName = TaurusForm.getCurveNames()[0]
+#        self.info("Curve call: %s"%(curveName))
+#        self._histogramCurve = TaurusForm.getCurve(curveName)
         

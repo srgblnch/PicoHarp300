@@ -5,18 +5,19 @@
   <PanelDescriptions>
     <PanelDescription>
       <name>Histogram</name>
-      <classname>TaurusPlot</classname>
-      <modulename/>
+      <classname>HistogramPlot</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>True</floating>
       <sharedDataWrite/>
       <sharedDataRead/>
       <model>bl34/di/PhCt-01/histogram</model>
+      <!--model>bl34/di/PhCt-01</model-->
     </PanelDescription>
     <PanelDescription>
       <name>Channel 0</name>
-      <classname>TaurusForm</classname>
-      <modulename/>
+      <classname>Channel0Form</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>True</floating>
       <sharedDataWrite/>
@@ -27,8 +28,8 @@
     </PanelDescription>
     <PanelDescription>
       <name>Channel 1</name>
-      <classname>TaurusForm</classname>
-      <modulename/>
+      <classname>Channel1Form</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>True</floating>
       <sharedDataWrite/>
@@ -38,8 +39,8 @@
     </PanelDescription>
     <PanelDescription>
       <name>Acquisition</name>
-      <classname>TaurusForm</classname>
-      <modulename/>
+      <classname>AcquisitionForm</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>True</floating>
       <sharedDataWrite/>
@@ -54,8 +55,8 @@
     </PanelDescription>
     <PanelDescription>
       <name>Monitor</name>
-      <classname>TaurusForm</classname>
-      <modulename/>
+      <classname>MonitorForm</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>True</floating>
       <sharedDataWrite/>
@@ -77,14 +78,24 @@
     </PanelDescription>
     <PanelDescription>
       <name>Status</name>
-      <classname>TaurusForm</classname>
-      <modulename/>
+      <classname>StateForm</classname>
+      <modulename>widgets.panels</modulename>
       <widgetname/>
       <floating>True</floating>
       <sharedDataWrite/>
       <sharedDataRead/>
       <model>bl34/di/PhCt-01/state, 
              bl34/di/PhCt-01/status</model>
+    </PanelDescription>
+    <PanelDescription>
+      <name>Warnings</name>
+      <classname>WargningForm</classname>
+      <modulename>widgets.panels</modulename>
+      <widgetname/>
+      <floating>True</floating>
+      <sharedDataWrite/>
+      <sharedDataRead/>
+      <model>bl34/di/PhCt-01/Warnings</model>
     </PanelDescription>
   </PanelDescriptions>
   <MONITOR/>
