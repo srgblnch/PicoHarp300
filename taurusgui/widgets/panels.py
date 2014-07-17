@@ -23,6 +23,11 @@
 ##
 #############################################################################
 
+#TODO: widget to select the device
+#      combo with all the Photon counters
+
+#TODO: instrument warnings text messages
+
 from taurus.qt.qtgui.panel import TaurusCommandsForm
 
 class PhCtCommands(TaurusCommandsForm):
@@ -75,6 +80,9 @@ class HistogramPlot(TaurusPlot):
     def __init__(self, parent=None, designMode=False):
         TaurusPlot.__init__(self, parent, designMode)
         self._curveName = None
+        #TODO: XAxis related with the instrument resolution
+        #TODO: Fix ranges on X and Y [0:65535]
+        #TODO: can be play the colour of this curve to show quality?
 
     def getModel(self):
         return TaurusPlot.getModel(self).rsplit('/',1)[0]
