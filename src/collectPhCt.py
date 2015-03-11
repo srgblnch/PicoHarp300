@@ -178,6 +178,7 @@ class Logger:
             i += 1
         msg += " ] "
         return msg
+#----# end class Logger
 
 import PyTango
 from threading import Event
@@ -205,6 +206,7 @@ class Collector(Logger):
         self._csv = CSVOutput(self._outputName,
                               "%s/%s"%(self._devName,self._attrName),
                               self.getLogLevel())
+    #----# first level
     def start(self):
         '''Start the procedure to collect information from where the object
            is configured and store it where the object is also configured to.
@@ -216,28 +218,11 @@ class Collector(Logger):
         start_t = time.time()
         while not self._ctrlC.isSet():
             seconds = int(time.time() - start_t)
-            if seconds % 10 == 0 and seconds >= 10:
-                fileSize,unit = self._csv.getSize()
-                #self.info_stream("%s %s"%(fileSize,unit))
-                if unit == MAXOUTPUTUNIT and fileSize >= MAXOUTPUTSIZE:
-                    self.error_stream("Reached the maximum output file "\
-                                      "allowed (%s %s). Force finish!"
-                                      %(MAXOUTPUTSIZE,MAXOUTPUTUNIT))
-                    break
-            if seconds % 60 == 0 and seconds >= 60:
-                minutes = seconds / 60
-                fileSize,unit = self._csv.getSize()
-                msg = "%d minute(s) collecting (file size %s %s)"\
-                      %(minutes,fileSize,unit)
-                if not unit == MAXOUTPUTUNIT:
-                    self.info_stream(msg)
-                else:
-                    self.warning_stream("%s: be careful with the output "\
-                                        "file size!"%(msg))
-                if minutes >= self._tcollecting:
-                    self.info_stream("Time collecting completed (%d). "\
-                                     "Finishing"%(self._tcollecting))
-                    break
+            if seconds % 10 == 0 and seconds >= 10 and self._checkFileTooBig():
+                break
+            if seconds % 60 == 0 and seconds >= 60 and \
+                                            self._checkTimeCollecting(seconds):
+                break
             time.sleep(1)
         self.unsubscribe()
         self._csv.close()
@@ -247,6 +232,7 @@ class Collector(Logger):
         self.trace_stream("Collector.stop()")
         self._ctrlC.set()
         self.info_stream("Wait the stop process to finish...")
+    #----# second level
     def subscribe(self):
         '''Method to do the procedure to subscribe to all the events this 
            object needs.
@@ -285,6 +271,32 @@ class Collector(Logger):
             self._csv.writeEvent(event)
         except Exception,e:
             self.error_stream("event exception",e)
+    #----# third level
+    def _checkFileTooBig(self):
+        fileSize,unit = self._csv.getSize()
+        if unit == MAXOUTPUTUNIT and fileSize >= MAXOUTPUTSIZE:
+            self.error_stream("Reached the maximum output file "\
+                              "allowed (%s %s). Force finish!"
+                              %(MAXOUTPUTSIZE,MAXOUTPUTUNIT))
+            return True
+        return False
+    def _checkTimeCollecting(self,period):
+        minutes = seconds / 60
+        fileSize,unit = self._csv.getSize()
+        msg = "%d minute(s) collecting (file size %s %s)"\
+              %(minutes,fileSize,unit)
+        if not unit == MAXOUTPUTUNIT:
+            self.info_stream(msg)
+        else:
+            self.warning_stream("%s: be careful with the output "\
+                                "file size!"%(msg))
+        if minutes >= self._tcollecting:
+            self.info_stream("Time collecting completed (%d). "\
+                             "Finishing"%(self._tcollecting))
+            return True
+        return False
+#----# end class Collector
+
 from numpy import ndarray
 import os
 import math
@@ -299,6 +311,8 @@ class CSVOutput(Logger):
         self._fileName = fileName
         self._fieldName = fieldName
         self._file = None
+
+    #----# first level
     def open(self,mode='w+'):
         self.trace_stream("CSVOutput.open()")
         self._file = open(self._fileName,mode)
@@ -350,6 +364,7 @@ class CSVOutput(Logger):
         if self.isOpen():
             self._file.write("%s\n"%(line))
             self._file.flush()
+#----# end class CSVOutput
 
 from optparse import OptionParser
 import signal
