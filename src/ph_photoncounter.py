@@ -45,6 +45,9 @@ import pprint #used for Exec()
 import threading
 import time
 import math
+
+TIME_BETWEEN_CHANGING = 0.1 #s
+TIME_HOLD_ALARM = 1 #s
 #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.additionnal_import
 
 ##############################################################################
@@ -225,7 +228,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 if self._acquisitionStop.isSet():
                     self._instrument.abort()
                     break
-                time.sleep(0.1)
+                time.sleep(TIME_BETWEEN_CHANGING)
                 #launch events with "changing" quality
                 self.fireAcqusitionEvents(PyTango.AttrQuality.ATTR_CHANGING)
             #launch final events with quality "valid"
@@ -256,7 +259,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             if self.get_state() == PyTango.DevState.ALARM:
                 #in case of alarms, extend the time between acq to 
                 #allow the alarm to be saw.
-                time.sleep(1)
+                time.sleep(TIME_HOLD_ALARM)
         if self.get_state() == PyTango.DevState.FAULT:
             self.set_state(PyTango.DevState.ON)
     #---- Done threaded acquisition region
