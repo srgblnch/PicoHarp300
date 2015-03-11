@@ -38,7 +38,7 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from threading import Thread,Event
 import random #used in the simulator
 import time #used in the simulator
-#import numpy as np #used in the simulator
+#cimport numpy as np #used in the simulator
 
 cdef extern from "phlib.h":
     int PH_GetErrorString(char* errstring, int errcode)
@@ -300,12 +300,12 @@ class Instrument(Logger):
         self.clearHistMem()
         self.getCountRates()
         self.startMeas()
-        time.sleep(self._acquisitionTime/1e6)
+        time.sleep(self._acquisitionTime/1e3)
         waitloop = 0
         self._acqAbort.clear()
         while(self.getCounterStatus()==0 and not self._acqAbort.isSet()):
             waitloop += 1
-            time.sleep(self._acquisitionTime/1e6)
+            time.sleep(self._acquisitionTime/1e3)
             #acqTime from ms to seconds and divide by another thousand.
         self.stopMeas()
         self.getHistogram()
@@ -1236,15 +1236,16 @@ class InstrumentSimulator(Instrument):
            - 0:  acquisition still running
            - >0: acquisition has ended.
         '''
-        if time.time() >= self._startMeasTime + (self._acquisitionTime/1000.):
+        if self.getElapsedMeasTime() >= self._acquisitionTime:
+        #if time.time() >= self._startMeasTime + (self._acquisitionTime/1000.):
             self.getHistogram()
             return 1
         else:
             #counts to add
-            counts2add = random.randint(1000,10000)
-            #self.debug("Add %d counts"%(counts2add))
+            counts2add = random.randint(1e6,1e9)
+            self.debug("Add %d counts"%(counts2add))
             while counts2add > 0:
-                pos = random.randint(0,HISTCHAN-1)
+                pos = self.getRandomPosition()
                 try:
                     if self._histograms[self._block][pos] < HISTCHAN:
                         self._histograms[self._block][pos] += 1
@@ -1253,6 +1254,19 @@ class InstrumentSimulator(Instrument):
                     self.debug("Ups, this shouldn't happen in getCounterStatus: %s"%(e))
             #self.getHistogram()
             return 0
+    def getRandomPosition(self):
+        #TODO: stablish how to change the distribution
+        distribution = 'gauss'
+        #normal random:
+        if distribution == 'basic':
+            pos = random.randint(0,HISTCHAN-1)
+        elif distribution == 'gauss':
+            group = random.randint(1,10)
+            shift = HISTCHAN/20
+            pos = -1
+            while not (0 <=  pos <= HISTCHAN-1):
+                pos = int(random.gauss(group*HISTCHAN/10-shift,HISTCHAN/100))
+        return pos
 
     def stopMeas(self):
         '''Stops the current measurement.
@@ -1292,8 +1306,13 @@ class InstrumentSimulator(Instrument):
         return self._flags
 
     def getElapsedMeasTime(self):
+        '''Get the time acquiring in miliseconds. 0 in other case, like not 
+           currently acquiring.
+        '''
         if not self._startMeasTime == None:
-            return time.time() - self._startMeasTime
+            elapsed = (time.time() - self._startMeasTime)*1e3
+            self.debug("Measuring since %g"%(elapsed))
+            return elapsed
         else:
             return 0
 
