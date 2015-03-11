@@ -89,41 +89,51 @@ WargningForm = TaurusForm
 #class WargningForm(PhCtForm):
 #    _attributes = ['Warnings']
 
-from taurus.qt.qtgui.plot import TaurusPlot
+from taurus.qt.qtgui.plot import TaurusPlot,TaurusCurve
 
-HistogramPlot = TaurusPlot
+#HistogramPlot = TaurusPlot
 
-#class HistogramPlot(TaurusPlot):
-#    pass
-#    def __init__(self, parent=None, designMode=False):
-#        TaurusPlot.__init__(self, parent, designMode)
-#        #self._curveName = None
-#        #TODO: XAxis related with the instrument resolution
-#        #TODO: Fix ranges on X and Y [0:65535]
-#        #TODO: can be play the colour of this curve to show quality?
+class HistogramPlot(TaurusPlot):
+    pass
+    def __init__(self, parent=None, designMode=False):
+        TaurusPlot.__init__(self, parent, designMode)
+        #self._curveName = None
+        #TODO: XAxis related with the instrument resolution
+        #TODO: Fix ranges on X and Y [0:65535]
+        #TODO: can be play the colour of this curve to show quality?
 
-#    def getModel(self):
-#        #TODO: robusteness
-#        superClassModel = TaurusPlot.getModel(self)
-#        if type(superClassModel) == list and len(superClassModel) == 1:
-#            attrName = superClassModel[0]
-#            devName = attrName.rsplit('/',1)[0]
-#            return devName
-#        return ""
-#    def setModel(self,model):
-#        self.info("HistogramPlot model = %s"%(model))
-#        #TODO: validate the model is a device with an attribute 'histogram'
-#        if type(model) == list and len(model) == 1:
-#            superClassModel = ['%s/histogram'%(model[0])]
-#        elif type(model) == str:
-#            superClassModel = ['%s/histogram'%(model)]
-#        else:
-#            self.error("HistogramPlot wrong model type set! %s"%(type(model)))
-#            return
-#        self.info("HistogramPlot superClassModel = %s"%(superClassModel))
-#        TaurusPlot.setModel(self,superClassModel)
-#        
-#        curveName = TaurusForm.getCurveNames()[0]
-#        self.info("Curve call: %s"%(curveName))
-#        self._histogramCurve = TaurusForm.getCurve(curveName)
+    def getModel(self):
+        return self._modelNames
+    def setModel(self,model):
+        '''sets the model of the Tango attribute that should be displayed in
+           this TaurusPlot. But different from the superclass only one model
+           in the list, two curves plot: one for the curve when quality is 
+           changing and the other for when is valid.
+        '''
+        self.info("HistogramPlot model = %s"%(model))
+        #Don't do: TaurusPlot.setModel(self,model)
+        if type(model) == list and len(model) == 1:
+            self._modelNames = [model[0]]
+        elif type(model) == str:
+            self._modelNames = [model]
+        else:
+            self.error("HistogramPlot wrong model type set! %s"%(type(model)))
+            return
+        #TODO: validate name corresponds with and attribute
+        self.updateCurves(self._modelNames)
+        self.emit(Qt.SIGNAL("modelChanged()"))
+        #update the modelchooser list
+        if self.DataImportDlg is not None:
+            self.DataImportDlg.modelChooser.setListedModels(self._modelNames)
         
+#        curveName = self.getCurveNames()[0]
+#        self.info("Curve call: %s"%(curveName))
+#        self._histogramCurve = self.getCurve(curveName)
+
+    #TODO: two curves must be set up per model (in fact, only one model is 
+    #      accepted).
+        
+class ChangingCurve(TaurusCurve):
+    pass
+class ValidCurve(TaurusCurve):
+    pass
