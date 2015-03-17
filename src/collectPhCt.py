@@ -198,7 +198,8 @@ class Collector(Logger):
         self._devName = devName
         self._dproxy = PyTango.DeviceProxy(self._devName)
         self._attrName = attrName
-        self._extraAttrs = []
+        self._extraAttrList = []
+        self._extraAttrProxies = []
         self.prepareExtraAttrs(extraAttr)
         self._tcollecting = timecollecting
         self._outputName = output
@@ -207,7 +208,7 @@ class Collector(Logger):
         self._events = []
         self._csv = CSVOutput(self._outputName,
                               "%s/%s"%(self._devName,self._attrName),
-                              extraAttr,
+                              self._extraAttrList,
                               self.getLogLevel())
     #----# first level
     def start(self):
@@ -261,7 +262,8 @@ class Collector(Logger):
         for attrName in extraAttrList:
             if attrName.count('/') == 0:#no slashes means no full name
                 attrName = self._devName+'/'+attrName
-            self._extraAttrs.append(PyTango.AttributeProxy(attrName))
+            self._extraAttrList.append(attrName)
+            self._extraAttrProxies.append(PyTango.AttributeProxy(attrName))
         
     def _histogramChangeEvent(self,event):
         '''Callback method for the histogram events.
@@ -279,7 +281,7 @@ class Collector(Logger):
             self.debug_stream("%s/%s\t%s\t%s"
                               %(self._devName,self._attrName,tstamp,quality),
                               event.attr_value.value)
-            self._csv.writeEvent(event,self._extraAttrs)
+            self._csv.writeEvent(event,self._extraAttrProxies)
         except Exception,e:
             self.error_stream("event exception",e)
     #----# third level
@@ -330,6 +332,7 @@ class CSVOutput(Logger):
         self._file = open(self._fileName,mode)
     def close(self):
         self.trace_stream("CSVOutput.close()")
+        self._file.flush()
         self._file.close()
     def isOpen(self):
         self.trace_stream("CSVOutput.isOpen()")
@@ -401,6 +404,7 @@ def signal_handler(signal, frame):
 DEFAULT_LOGLEVEL = "info"
 DEFAULT_PHCTDEVICE = "bl34/di/phct-01"
 DEFAULT_PHCTHISTOGRAM = "Histogram"
+DEFAULT_EXTRAATTRS = ['SR/DI/DCCT/AverageCurrent','ElapsedMeasTime']
 
 def main():
     parser = OptionParser()
@@ -466,8 +470,7 @@ def main():
         for e in l:
             options.extra_attributes.append(e.strip())
         
-    options.extra_attributes = ['SR/DI/DCCT/AverageCurrent',
-                               'ElapsedMeasTime'] + options.extra_attributes
+    options.extra_attributes = DEFAULT_EXTRAATTRS + options.extra_attributes
     log.info_stream( "extra attr:      %s"%(options.extra_attributes))
     global collector
     collector = Collector(options.device,options.attribute,
