@@ -191,13 +191,15 @@ class Collector(Logger):
        where the data wants to be collected, manage the events to store in a
        file.
     '''
-    def __init__(self,devName,attrName,timecollecting,output,
+    def __init__(self,devName,attrName,extraAttr,timecollecting,output,
                  loglevel=Logger.info):
         Logger.__init__(self, loglevel)
         self.trace_stream("Collector.__init__()")
         self._devName = devName
         self._dproxy = PyTango.DeviceProxy(self._devName)
         self._attrName = attrName
+        self._extraAttrs = []
+        self.prepareExtraAttrs(extraAttr)
         self._tcollecting = timecollecting
         self._outputName = output
         self._ctrlC = Event()
@@ -205,6 +207,7 @@ class Collector(Logger):
         self._events = []
         self._csv = CSVOutput(self._outputName,
                               "%s/%s"%(self._devName,self._attrName),
+                              extraAttr,
                               self.getLogLevel())
     #----# first level
     def start(self):
@@ -252,6 +255,14 @@ class Collector(Logger):
         for eventId in self._events:
             self.debug_stream("unsubscribe id",eventId)
             self._dproxy.unsubscribe_event(eventId)
+    def prepareExtraAttrs(self,extraAttrList):
+        '''
+        '''
+        for attrName in extraAttrList:
+            if attrName.count('/') == 0:#no slashes means no full name
+                attrName = self._devName+'/'+attrName
+            self._extraAttrs.append(PyTango.AttributeProxy(attrName))
+        
     def _histogramChangeEvent(self,event):
         '''Callback method for the histogram events.
         '''
@@ -268,7 +279,7 @@ class Collector(Logger):
             self.debug_stream("%s/%s\t%s\t%s"
                               %(self._devName,self._attrName,tstamp,quality),
                               event.attr_value.value)
-            self._csv.writeEvent(event)
+            self._csv.writeEvent(event,self._extraAttrs)
         except Exception,e:
             self.error_stream("event exception",e)
     #----# third level
@@ -281,7 +292,7 @@ class Collector(Logger):
             return True
         return False
     def _checkTimeCollecting(self,period):
-        minutes = seconds / 60
+        minutes = period / 60
         fileSize,unit = self._csv.getSize()
         msg = "%d minute(s) collecting (file size %s %s)"\
               %(minutes,fileSize,unit)
@@ -305,12 +316,13 @@ class CSVOutput(Logger):
     '''Class to handle the output file of the collector object. In particular 
        this class will output a csv structured file.
     '''
-    def __init__(self,fileName,fieldName,loglevel=Logger.info):
+    def __init__(self,fileName,fieldName,extraAttrs,loglevel=Logger.info):
         Logger.__init__(self, loglevel)
         self.trace_stream("CSVOutput.__init__()")
         self._fileName = fileName
         self._fieldName = fieldName
         self._file = None
+        self._extraAttrs = extraAttrs
 
     #----# first level
     def open(self,mode='w+'):
@@ -341,9 +353,13 @@ class CSVOutput(Logger):
         return (0,"B")
     def writeHeader(self):
         self.trace_stream("CSVOutput.writeHeader()")
+        header = "Timestamp\tquality\t"
+        for attrName in self._extraAttrs:
+            header = "%s%s\t"%(header,attrName)
+        header = "%s%s\n"%(header,self._fieldName)
         if self.isOpen():
-            self._file.write("Timestamp\tquality\t%s\n"%(self._fieldName))
-    def writeEvent(self,event):
+            self._file.write(header)
+    def writeEvent(self,event,extraAttrs):
         '''Translate an event to a csv list structure and write it to the file.
         '''
         self.trace_stream("CSVOutput.writeEvent()")
@@ -351,6 +367,12 @@ class CSVOutput(Logger):
                  %(event.attr_value.time.tv_sec,event.attr_value.time.tv_usec)
         quality = "%s"%(event.attr_value.quality)
         line = "%s\t%s"%(tstamp,quality)
+        for attribute in extraAttrs:
+            try:
+                value = attribute.read().value
+            except:
+                value = float('NaN')
+            line = "%s\t%s"%(line,value)
         if type(event.attr_value.value) == ndarray:
             value = "%s"%(event.attr_value.value.tolist())
             value = value.replace('[','')
@@ -391,6 +413,10 @@ def main():
     parser.add_option('',"--attribute",default=DEFAULT_PHCTHISTOGRAM,
                       help="Attribute name to use. If not said is used the "\
                       "default %s"%(DEFAULT_PHCTHISTOGRAM))
+    parser.add_option('',"--extra-attributes",
+                      help="List of attribute names (with the device if "\
+                           "diferent than the 'device' option) to be read"\
+                           "and write into each record.")
     parser.add_option('',"--minutes-collecting",default=0,
                       help="Minutes with this process collecting. If not "\
                       "specified, until Ctrl+C or more than %d %s file output"
@@ -430,8 +456,22 @@ def main():
     log.info_stream( "attribute:       %s"%(options.attribute))
     log.debug_stream("time collecting: %s"%(options.minutes_collecting))
     log.info_stream( "output:          %s"%(options.output))
+    if options.extra_attributes == None:
+        options.extra_attributes = []
+    else:
+        s = options.extra_attributes
+        s = s.replace('[','');s = s.replace(']','')
+        l = s.split(',')
+        options.extra_attributes = []
+        for e in l:
+            options.extra_attributes.append(e.strip())
+        
+    options.extra_attributes = ['SR/DI/DCCT/AverageCurrent',
+                               'ElapsedMeasTime'] + options.extra_attributes
+    log.info_stream( "extra attr:      %s"%(options.extra_attributes))
     global collector
     collector = Collector(options.device,options.attribute,
+                          options.extra_attributes,
                           options.minutes_collecting,options.output,
                           options.log_level)
     signal.signal(signal.SIGINT, signal_handler)
