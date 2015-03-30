@@ -30,14 +30,14 @@
 ##
 ###############################################################################
 
-from version import MAJOR_VERSION,MINOR_VERSION,BUILD_VERSION,REVISION_VERSION
-import time
+from version import version,BUILD_VERSION,REVISION_VERSION
+from time import sleep
+from datetime import datetime
 cimport cython
 #from libc.stdlib cimport calloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
-from threading import Thread,Event
+from threading import Thread,Event,currentThread
 import random #used in the simulator
-import time #used in the simulator
 #cimport numpy as np #used in the simulator
 
 cdef extern from "phlib.h":
@@ -50,15 +50,37 @@ def __strcut(str):
     '''
     return str.split('\x00')[0]
 
+ERROR   = 1
+WARNING = 2
+INFO    = 3
+DEBUG   = 4
+
 class Logger:
     '''This class is a very basic debugging flag mode used as a super class
        for the other classes in this library.
     '''
+    type = {ERROR:  'ERROR',
+            WARNING:'WARNING',
+            INFO:   'INFO',
+            DEBUG:  'DEBUG'}
     def __init__(self,debug):
         self.__debug = debug
+    @property
+    def _threadId(self):
+        return currentThread().getName()
+    def _print(self,msg,type):
+        #when = time.strftime("%Y-%m-%d %H:%M:%S")
+        when = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        print("%10s\t%s\t%s\t%s"%(self._threadId,type,when,msg))
+    def error(self,msg):
+        self._print(msg,self.type[ERROR])
+    def warning(self,msg):
+        self._print(msg,self.type[WARNING])
+    def info(self,msg):
+        self._print(msg,self.type[INFO])
     def debug(self,msg):
         if self.__debug:
-            print(msg)
+            self._print(msg,self.type[DEBUG])
     def interpretError(self,err):
         ErrorString = " "*40
         PH_GetErrorString(ErrorString, err)
@@ -264,7 +286,7 @@ class Instrument(Logger):
         self.getCountRates()
         #From dlldemo.c: after Init or SetSyncDiv you must allow 100 ms 
         #for valid new count rate readings.
-        time.sleep(0.2)#200ms
+        sleep(0.2)#200ms
         self.setStopOverflow()
         return self
 
@@ -284,12 +306,12 @@ class Instrument(Logger):
             return False
         if not async:
             self.debug("Synchronous acquisition, return when finished")
-            self.__acquisitionProcedure()
-            return True
+            return self.__acquisitionProcedure()
         else:
             self.debug("Asynchronous acquisition, check "\
                        "isAsyncAcquisitionDone() to know it's finished")
-            self._thread = Thread(target=self.__acquisitionProcedure)
+            self._thread = Thread(target=self.__acquisitionProcedure,
+                                  name="PicoHarpAcq")
             self._thread.start()
             return True
 
@@ -297,30 +319,33 @@ class Instrument(Logger):
         '''This method does an acquisition bounded by the settings previously
            set up (or in the constructor on changed by the setters).
         '''
-        self.clearHistMem()
-        self.getCountRates()
-        self.startMeas()
-        time.sleep(self._acquisitionTime/1e3)
-        waitloop = 0
-        self._acqAbort.clear()
-        while(self.getCounterStatus()==0 and not self._acqAbort.isSet()):
-            waitloop += 1
-            time.sleep(self._acquisitionTime/1e3)
-            #acqTime from ms to seconds and divide by another thousand.
-        self.stopMeas()
-        self.getHistogram()
-        self.getFlags()
-        self.integralCount()
-        self.debug("waitloop = %d total count = %d"
-                   %(waitloop,self._integralCount))
-        if (self._flags&FLAG_OVERFLOW):
-            self.debug("Overflow!")
+        try:
+            self.clearHistMem()
+            self.getCountRates()
+            self.startMeas()
+            sleep(self._acquisitionTime/1e3)
+            waitloop = 0
+            self._acqAbort.clear()
+            while(self.getCounterStatus()==0 and not self._acqAbort.isSet()):
+                waitloop += 1
+                sleep(self._acquisitionTime/1e3)
+                #acqTime from ms to seconds and divide by another thousand.
+            self.stopMeas()
+            self.getHistogram()
+            self.getFlags()
+            self.integralCount()
+            self.debug("waitloop = %d total count = %d"
+                       %(waitloop,self._integralCount))
+            if (self._flags&FLAG_OVERFLOW):
+                self.debug("Overflow!")
+                return False
+            if self._acqAbort.isSet():
+                self.debug("acquisition aborted!")
+                return False
+            return True
+        except IOError,e:
+            self.debug("I/O Error: %s"%(e))
             return False
-        if self._acqAbort.isSet():
-            self.debug("acquisition aborted!")
-            return False
-        return True
-        
 
     def isAsyncAcquisitionDone(self):
         '''When an acquisition has been launched in asynchronous mode, this 
@@ -602,8 +627,8 @@ class Instrument(Logger):
     
     def getCountRate(self,channel):
         '''For a given channel get the number of counts received per second.
-           It must be passed at least 100ms after initialise() or setSyncDivider()
-           to have a valid reading from this meter.
+           It must be passed at least 100ms after initialise() or 
+           setSyncDivider() to have a valid reading from this meter.
            Unit: Mcps (milions of counts per second)
         '''
         cdef int countrate = 0
@@ -616,8 +641,8 @@ class Instrument(Logger):
         return countrate
     def getCountRates(self,channel=None):
         '''Get the pair of count rates on both channels.
-           It must be passed at least 100ms after initialise() or setSyncDivider()
-           to have a valid reading from this meter.
+           It must be passed at least 100ms after initialise() or 
+           setSyncDivider() to have a valid reading from this meter.
            Unit: Mcps (milions of counts per second)
         '''
         if channel == None:
@@ -652,7 +677,8 @@ class Instrument(Logger):
            - ct: integer defining this maximum to stop if it's active.
            
            Examples:
-           >>> instrument.setStopOverflow()  #write the stored value in the object
+           >>> instrument.setStopOverflow()  #write the stored value in the
+                                             #object
            >>> instrument.setStopOverflow(0) #disable this feature
            >>> instrument.setStopOverflow(1,HISTCHAN-1)
            #enable this feature, but put the roof to the maximum possible.
@@ -699,8 +725,10 @@ class Instrument(Logger):
         '''Clean old values in an instrument memory block
            
            Examples:
-           >>> instrument.clearHistMem()  #set to 0s the default block histogram
-           >>> instrument.clearHistMem(N) #set to 0s the specified block histogram
+           >>> instrument.clearHistMem()  #set to 0s the default block 
+                                          #histogram
+           >>> instrument.clearHistMem(N) #set to 0s the specified block 
+                                          #histogram
         '''
         if block == None:
             block = self._block
@@ -780,16 +808,19 @@ class Instrument(Logger):
         return self
 
     def getHistogram(self,block=None):
-        '''Get a 1D array from the memory block by default or the specified in the argument.
+        '''Get a 1D array from the memory block by default or the specified 
+           in the argument.
            
            Examples:
-           >>> instrument.getHistogram()  #Get the histogram from the default block
-           >>> instrument.getHistogram(N) #Get the histogram from the specified block
+           >>> instrument.getHistogram()  #Get the histogram from the default 
+                                          #block
+           >>> instrument.getHistogram(N) #Get the histogram from the 
+                                          #specified block
         '''
         if block == None:
             block = self._block
         #cdef np.ndarray[np.uint32_t, ndim=1] counts = np.zeros([HISTCHAN],
-        #                                                      dtype=np.uint32)
+        #                                                     dtype=np.uint32)
         cdef unsigned int *counts
         try:
             #counts = <unsigned int*>malloc(HISTCHAN*cython.sizeof(int))
@@ -842,7 +873,8 @@ class Instrument(Logger):
         return self._flags
 
     def integralCount(self):
-        '''After get an histogram, calculate the accumulated counts in the array.
+        '''After get an histogram, calculate the accumulated counts in the 
+           array.
         '''
         integralCount = 0
         for count in self._counts:
@@ -1063,7 +1095,8 @@ class InstrumentSimulator(Instrument):
             Binning = self._Binning
         self._Resolution = self._BaseResolution * (2 ** Binning)
         self._Binning = Binning
-        self.debug("Binning = %d (Resolution = %g)"%(self._Binning,self._Resolution))
+        self.debug("Binning = %d (Resolution = %g)"
+                   %(self._Binning,self._Resolution))
         return self
 
     def getOffset(self):
@@ -1111,8 +1144,8 @@ class InstrumentSimulator(Instrument):
     
     def getCountRate(self,channel):
         '''For a given channel get the number of counts received per second.
-           It must be passed at least 100ms after initialise() or setSyncDivider()
-           to have a valid reading from this meter.
+           It must be passed at least 100ms after initialise() or 
+           setSyncDivider() to have a valid reading from this meter.
            Unit: Mcps (milions of counts per second)
         '''
         self._CountRate[channel] = random.randint(9e5,1e6)
@@ -1120,8 +1153,8 @@ class InstrumentSimulator(Instrument):
         return self._CountRate[channel]
     def getCountRates(self,channel=None):
         '''Get the pair of count rates on both channels.
-           It must be passed at least 100ms after initialise() or setSyncDivider()
-           to have a valid reading from this meter.
+           It must be passed at least 100ms after initialise() or 
+           setSyncDivider() to have a valid reading from this meter.
            Unit: Mcps (milions of counts per second)
         '''
         if channel == None:
@@ -1152,7 +1185,8 @@ class InstrumentSimulator(Instrument):
            - ct: integer defining this maximum to stop if it's active.
            
            Examples:
-           >>> instrument.setStopOverflow()  #write the stored value in the object
+           >>> instrument.setStopOverflow()  #write the stored value in the 
+                                             #object
            >>> instrument.setStopOverflow(0) #disable this feature
            >>> instrument.setStopOverflow(1,HISTCHAN-1)
            #enable this feature, but put the roof to the maximum possible.
@@ -1188,8 +1222,10 @@ class InstrumentSimulator(Instrument):
         '''Clean old values in an instrument memory block
            
            Examples:
-           >>> instrument.clearHistMem()  #set to 0s the default block histogram
-           >>> instrument.clearHistMem(N) #set to 0s the specified block histogram
+           >>> instrument.clearHistMem()  #set to 0s the default block 
+                                          #histogram
+           >>> instrument.clearHistMem(N) #set to 0s the specified block 
+                                          #histogram
         '''
         if block == None:
             block = self._block
@@ -1216,7 +1252,8 @@ class InstrumentSimulator(Instrument):
 
     def startMeas(self,AcquisitionTime=None):
         '''Call the instrument to start a measurement. Optionally this method 
-           can receive an acquisition time that will overwrite the stored value.
+           can receive an acquisition time that will overwrite the stored 
+           value.
         '''
         if AcquisitionTime == None:
             AcquisitionTime = self._acquisitionTime
@@ -1225,7 +1262,7 @@ class InstrumentSimulator(Instrument):
         if AcquisitionTime > ACQTMAX:
             raise ValueError("acq.time must be below %d"%(ACQTMAX))
         self._acquisitionTime = AcquisitionTime
-        self._startMeasTime = time.time()
+        self._startMeasTime = datetime.datetime.now()
         self.debug("start measurement")
         return self
     
@@ -1237,7 +1274,8 @@ class InstrumentSimulator(Instrument):
            - >0: acquisition has ended.
         '''
         if self.getElapsedMeasTime() >= self._acquisitionTime:
-        #if time.time() >= self._startMeasTime + (self._acquisitionTime/1000.):
+        #if datetime.datetime.now() >= \
+        #                  self._startMeasTime + (self._acquisitionTime/1000.):
             self.getHistogram()
             return 1
         else:
@@ -1251,7 +1289,8 @@ class InstrumentSimulator(Instrument):
                         self._histograms[self._block][pos] += 1
                         counts2add -= 1
                 except Exception,e:
-                    self.debug("Ups, this shouldn't happen in getCounterStatus: %s"%(e))
+                    self.debug("Ups, this shouldn't happen in "\
+                               "getCounterStatus: %s"%(e))
             #self.getHistogram()
             return 0
     def getRandomPosition(self):
@@ -1277,11 +1316,14 @@ class InstrumentSimulator(Instrument):
         return self
 
     def getHistogram(self,block=None):
-        '''Get a 1D array from the memory block by default or the specified in the argument.
+        '''Get a 1D array from the memory block by default or the specified 
+           in the argument.
            
            Examples:
-           >>> instrument.getHistogram()  #Get the histogram from the default block
-           >>> instrument.getHistogram(N) #Get the histogram from the specified block
+           >>> instrument.getHistogram()  #Get the histogram from the 
+                                          #default block
+           >>> instrument.getHistogram(N) #Get the histogram from the 
+                                          #specified block
         '''
         if block == None:
             block = self._block
@@ -1310,7 +1352,7 @@ class InstrumentSimulator(Instrument):
            currently acquiring.
         '''
         if not self._startMeasTime == None:
-            elapsed = (time.time() - self._startMeasTime)*1e3
+            elapsed = (datetime.now() - self._startMeasTime)*1e3
             self.debug("Measuring since %g"%(elapsed))
             return elapsed
         else:

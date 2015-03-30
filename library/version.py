@@ -33,4 +33,8 @@
 
 MAJOR_VERSION,MINOR_VERSION = 3,0#this comes from the phlib
 BUILD_VERSION = 0
-REVISION_VERSION = 0
+REVISION_VERSION = 1
+
+def version():
+    return "%s.%s.%s-%s"%(MAJOR_VERSION,MINOR_VERSION,
+                          REVISION_VERSION,BUILD_VERSION)
