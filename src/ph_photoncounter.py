@@ -922,6 +922,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.OverflowStopperThreshold_write) ENABLED START -----#
         try:
+            if data == 0:
+                #this is avoided by tango min value, but this is required 
+                #because when recover from memorized but without previous data,
+                #it tries to write a 0.
+                return
             self._instrument.setStopOverflow(count=data)
             stopper,self.attr_OverflowStopperThreshold_read = self._instrument.getStopOverflow()
             self.fireEventsList([['OverflowStopperThreshold',self.attr_OverflowStopperThreshold_read]])
@@ -1115,6 +1120,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.debug_stream("In write_TimeHoldingAlarm()")
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.TimeHoldingAlarm_write) ENABLED START -----#
+        if data == 0:
+            #this is avoided by tango min value, but this is required 
+            #because when recover from memorized but without previous data,
+            #it tries to write a 0.
+            return
         self.setTimeHoldingAlarm(data)
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.TimeHoldingAlarm_write
         
@@ -1554,6 +1564,8 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             PyTango.READ_WRITE],
             {
                 'label': "Overflow threshold",
+                'max value': "65536",
+                'min value': "1",
                 'Display level': PyTango.DispLevel.EXPERT,
                 'Memorized':"true"
             } ],
