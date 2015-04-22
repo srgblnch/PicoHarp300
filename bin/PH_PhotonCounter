@@ -1,0 +1,34 @@
+#!/bin/sh
+
+## Generic launcher script for Python DS.
+## Please note that copies of SERVER.py residing in the current directory
+## will be preferred over the version in $SICILIA/ds
+
+# map input arguments to names variables
+SERVER=`basename $0`
+INST=$1
+#echo 'instance "'$INST'"'
+LOGS=$2
+#echo 'logs "'$LOGS'"'
+
+# setup enviroment
+PYTHONPATH+=":$SICILIA/ds/python/$SERVER"
+
+cd "$SICILIA/ds/python/$SERVER"
+
+# workaround for RT #3273
+CMD="/usr/bin/python $SERVER.py"
+SCREEN="screen -dmS $SERVER-$INST"
+if [ "$INST" = "-?" ]
+then
+    $CMD $*
+else
+    if [ "$LOGS" = "" ]
+    then
+        echo 'setting minimum logs to -v2'
+        LOGS='-v2'
+    else
+        echo 'logs level at "'$LOGS'"'
+    fi
+    $SCREEN $CMD $INST $LOGS
+fi
