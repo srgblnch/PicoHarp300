@@ -55,6 +55,8 @@ WARNING = 2
 INFO    = 3
 DEBUG   = 4
 
+ACQ_MONITOR_T = 0.1
+
 class Logger:
     '''This class is a very basic debugging flag mode used as a super class
        for the other classes in this library.
@@ -71,7 +73,7 @@ class Logger:
     def _print(self,msg,type):
         #when = time.strftime("%Y-%m-%d %H:%M:%S")
         when = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        print("%10s\t%s\t%s\t%s"%(self._threadId,type,when,msg))
+        print("%10s\t%s\t%s\t%s\t%s"%(self._threadId,type,when,self._name,msg))
     def error(self,msg):
         self._print(msg,self.type[ERROR])
     def warning(self,msg):
@@ -124,6 +126,7 @@ class Discoverer(Logger):
     #TODO: in fact this is not a singleton, but it should.
     def __init__(self,debug=False):
         Logger.__init__(self, debug)
+        self._name = "Discoverer"
         self._instruments = {}
         self.__getInstruments()
 
@@ -133,20 +136,20 @@ class Discoverer(Logger):
            interpret the returned error.
         '''
         sn = " "*10
-        self.debug("Searching for PicoHarp devices...")
-        self.debug("Devidx     Status")
+        self.info("Searching for PicoHarp devices...")
+        self.info("Devidx     Status")
         for i in range(MAXDEVNUM):
             err = PH_OpenDevice(i,sn)
             if err == ERROR_NONE:
                 code = __strcut(sn)
-                self.debug("  %1d        S/N %s"%(i,code))
+                self.info("  %1d        S/N %s"%(i,code))
                 self._instruments[code] = i
             elif err == ERROR_DEVICE_OPEN_FAIL:
                 self.debug("  %1d        no device"%(i))
             else:
                 #Errorstring = " "*40
                 #PH_GetErrorString(Errorstring, err)
-                self.debug("  %1d        %s"%(i,self.interpretError(err)))
+                self.error("  %1d        %s"%(i,self.interpretError(err)))
         return self
 
     @property
@@ -240,6 +243,7 @@ class Instrument(Logger):
                  acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  stop=True,stopCount=HISTCHAN-1,debug=False):
         Logger.__init__(self, debug)
+        self._name = "Instrument%d"%devidx
         self._devidx = devidx
         if mode != MODE_HIST:
             raise NotImplementedError("Only histogram mode supported")
@@ -318,18 +322,32 @@ class Instrument(Logger):
     def __acquisitionProcedure(self):
         '''This method does an acquisition bounded by the settings previously
            set up (or in the constructor on changed by the setters).
+           
+           The time that the instrument will be measuring is set by the 
+           AcquisitionTime. The monitoring period inside this method will not
+           disturb that time. The only effect is that this method will take 
+           the exceed multiple of this time to return. The check is used to 
+           know when an abort is received or if there has been triggered an
+           error from the instrument. 
         '''
         try:
+            self.info("Starting Acquisition procedure...")
             self.clearHistMem()
             self.getCountRates()
             self.startMeas()
-            sleep(self._acquisitionTime/1e3)
+            sleep(ACQ_MONITOR_T)
             waitloop = 0
             self._acqAbort.clear()
-            while(self.getCounterStatus()==0 and not self._acqAbort.isSet()):
+            while not self._acqAbort.isSet():
                 waitloop += 1
-                sleep(self._acquisitionTime/1e3)
-                #acqTime from ms to seconds and divide by another thousand.
+                sleep(ACQ_MONITOR_T)
+                #Periodically the acquisition has to wake up to check if there
+                #has been an error (getCounterStatus will trigger an exception)
+                #or it's still running (getCounterStatus return 0) or it has
+                #ended (>0, usualy 1).
+                if self.getCounterStatus()>0:
+                    self.info("Acquisition completed")
+                    break
             self.stopMeas()
             self.getHistogram()
             self.getFlags()
@@ -351,7 +369,9 @@ class Instrument(Logger):
         '''When an acquisition has been launched in asynchronous mode, this 
            method with report if the acquisition has finished.
         '''
-        return not self._thread.isAlive()
+        if hasattr(self,'_thread') and self._thread != None:
+            return not self._thread.isAlive()
+        return True
 
     def abort(self):
         '''During an asynchronous acquisition, the way to stop a measurement 
@@ -360,6 +380,7 @@ class Instrument(Logger):
         if self._thread == None or not self._thread.isAlive():
             return False
         self._acqAbort.set()
+        self.debug("Raised the abort flag!")
         return True
 
     def __del__(self):
@@ -790,7 +811,7 @@ class Instrument(Logger):
         '''
         cdef int ctcstatus=0
         err = PH_CTCStatus(self._devidx,&ctcstatus)
-        if err != ERROR_NONE:
+        if err < 0 and err != ERROR_NONE:
             raise IOError("CTCStatus error (%d): %s"
                           %(err,self.interpretError(err)))
         #self.debug("counter status = %d"%(ctcstatus))
@@ -924,6 +945,7 @@ class InstrumentSimulator(Instrument):
                  acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  stop=True,stopCount=HISTCHAN-1,debug=False):
         Logger.__init__(self, debug)
+        self._name = "InstrumentSimulator"
         if mode != MODE_HIST:
             raise NotImplementedError("Only histogram mode supported")
         self._mode = mode
