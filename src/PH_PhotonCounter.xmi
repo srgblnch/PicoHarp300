@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ASCII"?>
 <pogoDsl:PogoSystem xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:pogoDsl="http://www.esrf.fr/tango/pogo/PogoDsl">
-  <classes name="PH_PhotonCounter" pogoRevision="8.1">
-    <description description="This device has been conceived to introduce a PicoHarp300 instrument &#xA;with in the tango control system.&#xA;&#xA;This device is not using directly the manufacturer's library. In this repository&#xA;you can find a cython extension to bind their library to python." title="PicoHarp photon counter" sourcePath="/home/serguei/src/Diagnostics/PicoHarp300/src" language="Python" filestogenerate="XMI   file" hasMandatoryProperty="true" hasConcreteProperty="true" hasAbstractCommand="false" hasAbstractAttribute="false">
+  <classes name="PH_PhotonCounter" pogoRevision="8.4">
+    <description description="This device has been conceived to introduce a PicoHarp300 instrument &#xA;with in the tango control system.&#xA;&#xA;This device is not using directly the manufacturer's library. In this repository&#xA;you can find a cython extension to bind their library to python." title="PicoHarp photon counter" sourcePath="/home/serguei/src/Diagnostics/PicoHarp300/src" language="Python" filestogenerate="XMI   file,Code files,html Pages" hasMandatoryProperty="true" hasConcreteProperty="true" hasAbstractCommand="false" hasAbstractAttribute="false" descriptionHtmlExists="false">
       <inheritances classname="Device_Impl" sourcePath=""/>
       <identification contact="at cells.es - sblanch" author="sblanch" emailDomain="cells.es" classFamily="Instrumentation" siteSpecific="" platform="Unix Like" bus="USB" manufacturer="PicoQuant GmbH" reference="PicoHarp300"/>
     </description>
@@ -389,6 +389,22 @@
       <dataReadyEvent fire="false" libCheckCriteria="true"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="Instrument debug information." label="DebugInfo" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+    </attributes>
+    <attributes name="TimeBetweenChanging" attType="Scalar" rwType="READ_WRITE" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="false" isDynamic="false">
+      <dataType xsi:type="pogoDsl:DoubleType"/>
+      <changeEvent fire="false" libCheckCriteria="false"/>
+      <archiveEvent fire="false" libCheckCriteria="false"/>
+      <dataReadyEvent fire="false" libCheckCriteria="true"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <properties description="Internal parameter of the device to configure the reading frequency to the instrument for intermediate values." label="Time Between Changing" unit="seconds" standardUnit="" displayUnit="" format="" maxValue="3" minValue="0.1" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+    </attributes>
+    <attributes name="TimeHoldingAlarm" attType="Scalar" rwType="READ_WRITE" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="false" isDynamic="false">
+      <dataType xsi:type="pogoDsl:DoubleType"/>
+      <changeEvent fire="false" libCheckCriteria="false"/>
+      <archiveEvent fire="false" libCheckCriteria="false"/>
+      <dataReadyEvent fire="false" libCheckCriteria="true"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <properties description="Internal parameter to configure how much time the alarm state is hold to allow the user to record the information." label="Time Holding Alarm" unit="seconds" standardUnit="" displayUnit="" format="" maxValue="3" minValue="1" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
     </attributes>
     <attributes name="Histogram" attType="Spectrum" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="65536" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:IntType"/>
