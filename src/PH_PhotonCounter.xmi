@@ -44,6 +44,7 @@
       <excludedStates>INIT</excludedStates>
       <excludedStates>ON</excludedStates>
       <excludedStates>RUNNING</excludedStates>
+      <excludedStates>STANDBY</excludedStates>
     </commands>
     <commands name="Off" description="" execMethod="off" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="">
@@ -57,6 +58,7 @@
       <excludedStates>INIT</excludedStates>
       <excludedStates>OFF</excludedStates>
       <excludedStates>RUNNING</excludedStates>
+      <excludedStates>STANDBY</excludedStates>
     </commands>
     <commands name="Start" description="" execMethod="start" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="">
@@ -70,6 +72,7 @@
       <excludedStates>INIT</excludedStates>
       <excludedStates>OFF</excludedStates>
       <excludedStates>RUNNING</excludedStates>
+      <excludedStates>STANDBY</excludedStates>
     </commands>
     <commands name="Stop" description="" execMethod="stop" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="">
@@ -83,6 +86,7 @@
       <excludedStates>INIT</excludedStates>
       <excludedStates>OFF</excludedStates>
       <excludedStates>ON</excludedStates>
+      <excludedStates>STANDBY</excludedStates>
     </commands>
     <commands name="Acquire" description="" execMethod="acquire" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="">
@@ -96,6 +100,7 @@
       <excludedStates>INIT</excludedStates>
       <excludedStates>OFF</excludedStates>
       <excludedStates>RUNNING</excludedStates>
+      <excludedStates>STANDBY</excludedStates>
     </commands>
     <commands name="Abort" description="" execMethod="abort" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="">
@@ -109,6 +114,7 @@
       <excludedStates>INIT</excludedStates>
       <excludedStates>OFF</excludedStates>
       <excludedStates>ON</excludedStates>
+      <excludedStates>STANDBY</excludedStates>
     </commands>
     <commands name="Exec" description="Dangerous command that allow to eval internally python code" execMethod="exec" displayLevel="EXPERT" polledPeriod="0">
       <argin description="">
@@ -129,6 +135,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="InstrumentPartnum" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:StringType"/>
@@ -140,6 +147,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="InstrumentVersion" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:StringType"/>
@@ -151,6 +159,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="SyncDivider" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:UShortType"/>
@@ -162,6 +171,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -176,6 +186,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -190,6 +201,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -204,6 +216,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -218,6 +231,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -229,6 +243,13 @@
       <dataReadyEvent fire="false" libCheckCriteria="true"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="Acquisition resolution." label="Resolution" unit="ps" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+      <readExcludedStates>FAULT</readExcludedStates>
+      <readExcludedStates>INIT</readExcludedStates>
+      <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
+      <writeExcludedStates>FAULT</writeExcludedStates>
+      <writeExcludedStates>INIT</writeExcludedStates>
+      <writeExcludedStates>OFF</writeExcludedStates>
     </attributes>
     <attributes name="Binning" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:UShortType"/>
@@ -240,6 +261,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -254,6 +276,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="Offset" attType="Scalar" rwType="READ_WRITE" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:ShortType"/>
@@ -265,6 +288,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -279,6 +303,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="CountRateCh1" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:IntType"/>
@@ -290,6 +315,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="OverflowStopper" attType="Scalar" rwType="READ_WRITE" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:BooleanType"/>
@@ -301,6 +327,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -315,6 +342,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -329,6 +357,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
       <writeExcludedStates>FAULT</writeExcludedStates>
       <writeExcludedStates>INIT</writeExcludedStates>
       <writeExcludedStates>OFF</writeExcludedStates>
@@ -343,6 +372,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="IntegralCount" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:LongType"/>
@@ -354,6 +384,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="HistogramMaxValue" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:IntType"/>
@@ -365,6 +396,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="ElapsedMeasTime" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:DoubleType"/>
@@ -373,6 +405,7 @@
       <dataReadyEvent fire="false" libCheckCriteria="true"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="" label="elapsed measurement time" unit="s" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="Warnings" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:StringType"/>
@@ -381,6 +414,7 @@
       <dataReadyEvent fire="false" libCheckCriteria="true"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="Human readable text from the instrument warning codes." label="Warnings" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="HardwareDebugInfo" attType="Scalar" rwType="READ" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:StringType"/>
@@ -389,6 +423,7 @@
       <dataReadyEvent fire="false" libCheckCriteria="true"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="Instrument debug information." label="DebugInfo" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <attributes name="TimeBetweenChanging" attType="Scalar" rwType="READ_WRITE" displayLevel="EXPERT" polledPeriod="0" maxX="" maxY="" memorized="true" memorizedAtInit="true" allocReadMember="false" isDynamic="false">
       <dataType xsi:type="pogoDsl:DoubleType"/>
@@ -416,6 +451,7 @@
       <readExcludedStates>FAULT</readExcludedStates>
       <readExcludedStates>INIT</readExcludedStates>
       <readExcludedStates>OFF</readExcludedStates>
+      <readExcludedStates>STANDBY</readExcludedStates>
     </attributes>
     <states name="ALARM" description="Alert that something is not going as expected, but it's not blocking.">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
