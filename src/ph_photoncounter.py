@@ -58,6 +58,7 @@ import PicoHarp
 import numpy as np
 from types import StringType #used for Exec()
 import pprint #used for Exec()
+import traceback
 import threading
 import time
 import math
@@ -215,19 +216,25 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 self.set_state(PyTango.DevState.FAULT)
                 self.set_status(msg)
                 return False
-        self.set_state(PyTango.DevState.OFF)
+        self.set_state(PyTango.DevState.STANDBY)
         return True
     def connect(self):
-        if not self.Simulation:
-            self._devidx = self._discoverer.search(self.SerialNumber)
-            self._instrument = PicoHarp.Instrument(self._devidx,debug=True)
-        else:
-            self._instrument = PicoHarp.InstrumentSimulator(debug=True)
-        self.set_state(PyTango.DevState.ON)
-        self.fireEventsList([['InstrumentModel',self._instrument.__model__],
-                             ['InstrumentPartnum',self._instrument.__partnum__],
-                             ['InstrumentVersion',self._instrument.__version__],
-                             ['BaseResolution',self._instrument.getBaseResolution()]])
+        try:
+            if not self.Simulation:
+                self._devidx = self._discoverer.search(self.SerialNumber)
+                self._instrument = PicoHarp.Instrument(self._devidx,debug=True)
+            else:
+                self._instrument = PicoHarp.InstrumentSimulator(debug=True)
+            self.set_state(PyTango.DevState.ON)
+            self.fireEventsList([
+                     ['InstrumentModel',self._instrument.__model__],
+                     ['InstrumentPartnum',self._instrument.__partnum__],
+                     ['InstrumentVersion',self._instrument.__version__],
+                     ['BaseResolution',self._instrument.getBaseResolution()]
+                                ])
+        except Exception,e:
+            self.set_state(PyTango.DevState.FAULT)
+            self.set_status("Connection failed due to: %s"%(e), important=True)
         
     def disconnect(self):
         if hasattr(self,'_instrument') and self._instrument != None:
@@ -245,6 +252,123 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     #---- Done instrument connectivity region
     
     #---- Threaded acquisition region
+    def _prepareThreading(self):
+        if not hasattr(self,'_acquisitionThread'):
+            self._acquisitionThread = None
+        if not hasattr(self,'_acquisitionStop'):
+            self._acquisitionStop = threading.Event()
+            self._acquisitionStop.clear()
+        if not hasattr(self,'_communicationsThread'):
+            self._communicationsThread = \
+                           threading.Thread(target=self._prepareCommunications)
+        
+    def _prepareDiscoverInstrument(self):
+        if not hasattr(self,'_discoverer'):
+            self._discoverer = None
+        if not hasattr(self,'_devidx'):
+            self._devidx = None
+        if not hasattr(self,'_instrument'):
+            self._instrument = None
+
+    def _prepareCommunications(self):
+        if not self._discoverer:
+            if not self.discover():
+                while not self.discover():
+                    time.sleep(1)
+                    self.warn_stream("Discoverer didn't find the instrument")
+            self.connect()
+            self._poststandby()
+            
+    def _poststandby(self):
+        self._checkSyncDivider()
+        self._checkZeroCrossChannels()
+        self._checkLevelChannels()
+        self._checkResolutionAndBinnig()
+        self._checkOffset()
+        self._checkOverflowStopper()
+        self._checkAcquisitionTime()
+        
+    def _checkSyncDivider(self):
+        if self.attr_SyncDivider_read != self._instrument.getSyncDivider():
+            self.debug_stream("Appyling stored SyncDivider = %g"
+                              %(self.attr_SyncDivider_read))
+            self._instrument.setSyncDivider(self.attr_SyncDivider_read)
+    def _checkZeroCrossChannels(self):
+        ZeroCross,level = self._instrument.getInputCFD(0)
+        if self.attr_ZeroCrossCh0_read != ZeroCross:
+            self.debug_stream("Appyling stored ZeroCrossCh0 = %g"
+                              %(self.attr_ZeroCrossCh0_read))
+            self._instrument.setInputCFD(0,\
+                                      CFDZeroCross=self.attr_ZeroCrossCh0_read)
+        ZeroCross,level = self._instrument.getInputCFD(1)
+        if self.attr_ZeroCrossCh1_read != ZeroCross:
+            self.debug_stream("Appyling stored ZeroCrossCh1 = %g"
+                              %(self.attr_ZeroCrossCh1_read))
+            self._instrument.setInputCFD(1,\
+                                      CFDZeroCross=self.attr_ZeroCrossCh1_read)
+    def _checkLevelChannels(self):
+        ZeroCross,level = self._instrument.getInputCFD(0)
+        if self.attr_LevelCh0_read != level:
+            self.debug_stream("Appyling stored LevelCh0 = %g"
+                              %(self.attr_ZeroCrossCh0_read))
+            self._instrument.setInputCFD(0,\
+                                          CFDLevel=self.attr_ZeroCrossCh0_read)
+        ZeroCross,level = self._instrument.getInputCFD(1)
+        if self.attr_LevelCh1_read != level:
+            self.debug_stream("Appyling stored LevelCh1 = %g"
+                              %(self.attr_ZeroCrossCh1_read))
+            self._instrument.setInputCFD(1,\
+                                          CFDLevel=self.attr_ZeroCrossCh1_read)
+    def _checkResolutionAndBinnig(self):
+        if self.attr_Resolution_read != self._instrument.getResolution():
+            try:
+                binning = \
+                     self._fromResolutionKnowBinning(self.attr_Resolution_read)
+                self.debug_stream("Appyling stored Resolution = %g"
+                                  %(self.attr_Resolution_read))
+                self._instrument.setBinning(binning)
+            except:
+                if self.attr_Binning_read != self._instrument.getBinning():
+                    self.debug_stream("Appyling stored Binning = %g"
+                                      %(self.attr_Binning_read))
+                    self._instrument.setBinning(self.attr_Binning_read)
+
+    def _fromResolutionKnowBinning(self,resolution):
+        baseResolution = self._instrument.getBaseResolution()
+        if resolution < baseResolution:
+            raise Exception("Resolution cannot go below the base "\
+                            "resolution (%f)"%baseResolution)
+        #inverse of resolution=baseResolution*(2**binning)
+        #and round the result to the closest binning
+        return int(math.ceil(math.log(resolution/baseResolution,2)))
+    
+    def _checkOffset(self):
+        if self.attr_Offset_read != self._instrument.getOffset():
+            self.debug_stream("Appyling stored Offset = %g"
+                              %(self.attr_Offset_read))
+            self._instrument.setOffset(self.attr_Offset_read)
+    
+    def _checkOverflowStopper(self):
+        stopper,threshold = self._instrument.getStopOverflow()
+        if self.attr_OverflowStopper_read != stopper:
+            self.debug_stream("Appyling stored OverflowStopper = %g"
+                              %(self.attr_OverflowStopper_read))
+            self._instrument.\
+                           setStopOverflow(stop=self.attr_OverflowStopper_read)
+        if self.attr_OverflowStopperThreshold_read > 0 and \
+                          self.attr_OverflowStopperThreshold_read != threshold:
+            self.debug_stream("Appyling stored OverflowStopperThreshold = %g"
+                              %(self.attr_OverflowStopperThreshold_read))
+            self._instrument.\
+                 setStopOverflow(count=self.attr_OverflowStopperThreshold_read)
+    def _checkAcquisitionTime(self):
+        if self.attr_AcquisitionTime_read != \
+                                   self._instrument.getAcquisitionTime()/1000.:
+            self.debug_stream("Appyling stored AcquisitionTime = %g"
+                              %(self.attr_AcquisitionTime_read))
+            self._instrument.setAcquisitionTime(\
+                                      int(self.attr_AcquisitionTime_read*1000))
+            
     def fireAcqusitionEvents(self,quality=PyTango.AttrQuality.ATTR_VALID):
         countRate = self._instrument.getCountRates()
         flags = self._instrument.getFlags()
@@ -289,6 +413,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         except Exception,e:
             msg = "Acquisition exception: %s"%(e)
             self.error_stream(msg)
+            traceback.print_exc()
             self.set_state(PyTango.DevState.FAULT)
             self.set_status(msg)
             self._acquisitionStop.set()
@@ -396,25 +521,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._locals = { 'self' : self }
         self._globals = globals()
         #some ifs to protect call init when already running
-        if not hasattr(self,'_acquisitionThread'):
-            self._acquisitionThread = None
-            self._acquisitionStop = threading.Event()
-            self._acquisitionStop.clear()
-        if not hasattr(self,'_discoverer'):
-            self._discoverer = None
-        if not self.isConnected():
-            if not self.discover():
-                time.sleep(0.1)
-                #In case of Init() call (never saw in device normal start up)
-                #it may happen that the discoverer needs a second try to find 
-                #the instrument. It's suspected that this may happen bacause
-                #the object has been deleted but not yet freed by the garbage
-                #collector.
-                if not self.discover():
-                    return
-            self._devidx = None
-            self._instrument = None
-            self.connect()
+        self._prepareThreading()
+        self._prepareDiscoverInstrument()
+        self.set_state(PyTango.DevState.OFF)
+        if not self._communicationsThread.isAlive():
+            self._communicationsThread.start()
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.init_device
 
     def always_executed_hook(self):
@@ -439,7 +550,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_InstrumentModel_allowed) ENABLED START -----#
@@ -459,7 +571,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_InstrumentPartnum_allowed) ENABLED START -----#
@@ -479,7 +592,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_InstrumentVersion_allowed) ENABLED START -----#
@@ -503,9 +617,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.SyncDivider_write) ENABLED START -----#
         try:
-            self._instrument.setSyncDivider(data)
-            self.attr_SyncDivider_read = self._instrument.getSyncDivider()
-            self.fireEventsList([['SyncDivider',self.attr_SyncDivider_read]])
+            if self._instrument:
+                self._instrument.setSyncDivider(data)
+                self.attr_SyncDivider_read = self._instrument.getSyncDivider()
+                self.fireEventsList([['SyncDivider',self.attr_SyncDivider_read]])
+            else:
+                self.attr_SyncDivider_read = data
         except Exception,e:
             self.error_stream("Exception with SyncDivider: %s"%e)
             raise e
@@ -516,7 +633,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -542,9 +660,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.ZeroCrossCh0_write) ENABLED START -----#
         try:
-            self._instrument.setInputCFD(0,CFDZeroCross=data)
-            self.attr_ZeroCrossCh0_read, level = self._instrument.getInputCFD(0)
-            self.fireEventsList([['ZeroCrossCh0',self.attr_ZeroCrossCh0_read]])
+            if self._instrument:
+                self._instrument.setInputCFD(0,CFDZeroCross=data)
+                self.attr_ZeroCrossCh0_read, level = self._instrument.getInputCFD(0)
+                self.fireEventsList([['ZeroCrossCh0',self.attr_ZeroCrossCh0_read]])
+            else:
+                self.attr_ZeroCrossCh0_read = data
         except Exception, e:
             self.error_stream("Exception with ZeroCrossCh0: %s"%e)
             raise e
@@ -555,7 +676,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -581,9 +703,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.ZeroCrossCh1_write) ENABLED START -----#
         try:
-            self._instrument.setInputCFD(1,CFDZeroCross=data)
-            self.attr_ZeroCrossCh1_read, level = self._instrument.getInputCFD(1)
-            self.fireEventsList([['ZeroCrossCh1',self.attr_ZeroCrossCh1_read]])
+            if self._instrument:
+                self._instrument.setInputCFD(1,CFDZeroCross=data)
+                self.attr_ZeroCrossCh1_read, level = self._instrument.getInputCFD(1)
+                self.fireEventsList([['ZeroCrossCh1',self.attr_ZeroCrossCh1_read]])
+            else:
+                self.attr_ZeroCrossCh1_read = data
         except Exception, e:
             self.error_stream("Exception with ZeroCrossCh1: %s"%e)
             raise e
@@ -594,7 +719,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -620,9 +746,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.LevelCh0_write) ENABLED START -----#
         try:
-            self._instrument.setInputCFD(0,CFDLevel=data)
-            ZeroCross, self.attr_LevelCh0_read = self._instrument.getInputCFD(0)
-            self.fireEventsList([['LevelCh0',self.attr_LevelCh0_read]])
+            if self._instrument:
+                self._instrument.setInputCFD(0,CFDLevel=data)
+                ZeroCross, self.attr_LevelCh0_read = self._instrument.getInputCFD(0)
+                self.fireEventsList([['LevelCh0',self.attr_LevelCh0_read]])
+            else:
+                self.attr_LevelCh0_read = data
         except Exception, e:
             self.error_stream("Exception with LevelCh0: %s"%e)
             raise e
@@ -633,7 +762,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -659,9 +789,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.LevelCh1_write) ENABLED START -----#
         try:
-            self._instrument.setInputCFD(1,CFDLevel=data)
-            ZeroCross, self.attr_LevelCh1_read = self._instrument.getInputCFD(1)
-            self.fireEventsList([['LevelCh1',self.attr_LevelCh1_read]])
+            if self._instrument:
+                self._instrument.setInputCFD(1,CFDLevel=data)
+                ZeroCross, self.attr_LevelCh1_read = self._instrument.getInputCFD(1)
+                self.fireEventsList([['LevelCh1',self.attr_LevelCh1_read]])
+            else:
+                self.attr_LevelCh1_read = data
         except Exception, e:
             self.error_stream("Exception with LevelCh1: %s"%e)
             raise e
@@ -672,7 +805,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -698,22 +832,35 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.Resolution_write) ENABLED START -----#
         try:
-            baseResolution = self._instrument.getBaseResolution()
-            if data<baseResolution:
-                raise Exception("Resolution cannot go below the base "\
-                               "resolution (%f)"%baseResolution)
-            #inverse of resolution=baseResolution*(2**binning)
-            #and round the result to the closest binning
-            binning = int(math.ceil(math.log(data/baseResolution,2)))
-            self._instrument.setBinning(binning)
-            self.attr_Binning_read = self._instrument.getBinning()
-            self.attr_Resolution_read = self._instrument.getResolution()
-            self.fireEventsList([['Binning',self.attr_Binning_read],
-                                 ['Resolution',self.attr_Resolution_read]])
+            if self._instrument:
+                binning = self._fromResolutionKnowBinning(data)
+                self._instrument.setBinning(binning)
+                self.attr_Binning_read = self._instrument.getBinning()
+                self.attr_Resolution_read = self._instrument.getResolution()
+                self.fireEventsList([['Binning',self.attr_Binning_read],
+                                     ['Resolution',self.attr_Resolution_read]])
+            else:
+                self.attr_Resolution_read = data
         except Exception, e:
             self.error_stream("Exception with Resolution: %s"%e)
             raise e
         #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.Resolution_write
+        
+    def is_Resolution_allowed(self, attr):
+        self.debug_stream("In is_Resolution_allowed()")
+        if attr==PyTango.AttReqType.READ_REQ:
+            state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
+                PyTango.DevState.INIT,
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
+        else:
+            state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
+                PyTango.DevState.INIT,
+                PyTango.DevState.OFF])
+        #----- PROTECTED REGION ID(PH_PhotonCounter.is_Resolution_allowed) ENABLED START -----#
+        
+        #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Resolution_allowed
+        return state_ok
         
     def read_Binning(self, attr):
         self.debug_stream("In read_Binning()")
@@ -731,11 +878,14 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.Binning_write) ENABLED START -----#
         try:
-            self._instrument.setBinning(data)
-            self.attr_Binning_read = self._instrument.getBinning()
-            self.attr_Resolution_read = self._instrument.getResolution()
-            self.fireEventsList([['Binning',self.attr_Binning_read],
-                                 ['Resolution',self.attr_Resolution_read]])
+            if self._instrument:
+                self._instrument.setBinning(data)
+                self.attr_Binning_read = self._instrument.getBinning()
+                self.attr_Resolution_read = self._instrument.getResolution()
+                self.fireEventsList([['Binning',self.attr_Binning_read],
+                                     ['Resolution',self.attr_Resolution_read]])
+            else:
+                self.attr_Binning_read = data
         except Exception, e:
             self.error_stream("Exception with Binning: %s"%e)
             raise e
@@ -746,7 +896,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -772,7 +923,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_BaseResolution_allowed) ENABLED START -----#
@@ -796,9 +948,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.Offset_write) ENABLED START -----#
         try:
-            self._instrument.setOffset(data)
-            self.attr_Offset_read = self._instrument.getOffset()
-            self.fireEventsList([['Offset',self.attr_Offset_read]])
+            if self._instrument:
+                self._instrument.setOffset(data)
+                self.attr_Offset_read = self._instrument.getOffset()
+                self.fireEventsList([['Offset',self.attr_Offset_read]])
+            else:
+                self.attr_Offset_read = data
         except Exception, e:
             self.error_stream("Exception with Offset: %s"%e)
             raise e
@@ -809,7 +964,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -835,7 +991,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_CountRateCh0_allowed) ENABLED START -----#
@@ -859,7 +1016,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_CountRateCh1_allowed) ENABLED START -----#
@@ -883,9 +1041,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.OverflowStopper_write) ENABLED START -----#
         try:
-            self._instrument.setStopOverflow(stop=data)
-            self.attr_OverflowStopper_read,stopperCt = self._instrument.getStopOverflow()
-            self.fireEventsList([['OverflowStopper',self.attr_OverflowStopper_read]])
+            if self._instrument:
+                self._instrument.setStopOverflow(stop=data)
+                self.attr_OverflowStopper_read,stopperCt = self._instrument.getStopOverflow()
+                self.fireEventsList([['OverflowStopper',self.attr_OverflowStopper_read]])
+            else:
+                self.attr_OverflowStopper_read = data
         except Exception, e:
             self.error_stream("Exception with OverflowStopper: %s"%e)
             raise e
@@ -896,7 +1057,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -923,13 +1085,16 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         #----- PROTECTED REGION ID(PH_PhotonCounter.OverflowStopperThreshold_write) ENABLED START -----#
         try:
             if data == 0:
-                #this is avoided by tango min value, but this is required 
+                #this is avoided by tango min value, but this is required
                 #because when recover from memorized but without previous data,
                 #it tries to write a 0.
                 return
-            self._instrument.setStopOverflow(count=data)
-            stopper,self.attr_OverflowStopperThreshold_read = self._instrument.getStopOverflow()
-            self.fireEventsList([['OverflowStopperThreshold',self.attr_OverflowStopperThreshold_read]])
+            if self._instrument:
+                self._instrument.setStopOverflow(count=data)
+                stopper,self.attr_OverflowStopperThreshold_read = self._instrument.getStopOverflow()
+                self.fireEventsList([['OverflowStopperThreshold',self.attr_OverflowStopperThreshold_read]])
+            else:
+                self.attr_OverflowStopperThreshold_read = data
         except Exception, e:
             self.error_stream("Exception with OverflowStopperThreshold: %s"%e)
             raise e
@@ -940,7 +1105,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -966,9 +1132,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         data=attr.get_write_value()
         #----- PROTECTED REGION ID(PH_PhotonCounter.AcquisitionTime_write) ENABLED START -----#
         try:
-            self._instrument.setAcquisitionTime(int(data*1000))
-            self.fireEventsList([['AcquisitionTime',
-                                  self._instrument.getAcquisitionTime()/1000.]])
+            if self._instrument:
+                self._instrument.setAcquisitionTime(int(data*1000))
+                self.attr_AcquisitionTime_read = self._instrument.getAcquisitionTime()/1000.
+                self.fireEventsList([['AcquisitionTime',self.attr_AcquisitionTime_read]])
+            else:
+                self.attr_AcquisitionTime_read = data
         except Exception, e:
             self.error_stream("Exception with AcquisitionTime: %s"%e)
             raise e
@@ -979,7 +1148,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
@@ -1005,7 +1175,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Flags_allowed) ENABLED START -----#
@@ -1029,7 +1200,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_IntegralCount_allowed) ENABLED START -----#
@@ -1052,7 +1224,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_HistogramMaxValue_allowed) ENABLED START -----#
@@ -1073,6 +1246,17 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.ElapsedMeasTime_read
         
+    def is_ElapsedMeasTime_allowed(self, attr):
+        self.debug_stream("In is_ElapsedMeasTime_allowed()")
+        if attr==PyTango.AttReqType.READ_REQ:
+            state_ok = not(self.get_state() in [PyTango.DevState.STANDBY])
+        else:
+            state_ok = not(self.get_state() in [])
+        #----- PROTECTED REGION ID(PH_PhotonCounter.is_ElapsedMeasTime_allowed) ENABLED START -----#
+        
+        #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_ElapsedMeasTime_allowed
+        return state_ok
+        
     def read_Warnings(self, attr):
         self.debug_stream("In read_Warnings()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Warnings_read) ENABLED START -----#
@@ -1085,6 +1269,17 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.Warnings_read
         
+    def is_Warnings_allowed(self, attr):
+        self.debug_stream("In is_Warnings_allowed()")
+        if attr==PyTango.AttReqType.READ_REQ:
+            state_ok = not(self.get_state() in [PyTango.DevState.STANDBY])
+        else:
+            state_ok = not(self.get_state() in [])
+        #----- PROTECTED REGION ID(PH_PhotonCounter.is_Warnings_allowed) ENABLED START -----#
+        
+        #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Warnings_allowed
+        return state_ok
+        
     def read_HardwareDebugInfo(self, attr):
         self.debug_stream("In read_HardwareDebugInfo()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.HardwareDebugInfo_read) ENABLED START -----#
@@ -1096,6 +1291,17 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                             important=True)
             self.set_state(PyTango.DevState.FAULT)
         #----- PROTECTED REGION END -----#    //    PH_PhotonCounter.HardwareDebugInfo_read
+        
+    def is_HardwareDebugInfo_allowed(self, attr):
+        self.debug_stream("In is_HardwareDebugInfo_allowed()")
+        if attr==PyTango.AttReqType.READ_REQ:
+            state_ok = not(self.get_state() in [PyTango.DevState.STANDBY])
+        else:
+            state_ok = not(self.get_state() in [])
+        #----- PROTECTED REGION ID(PH_PhotonCounter.is_HardwareDebugInfo_allowed) ENABLED START -----#
+        
+        #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_HardwareDebugInfo_allowed
+        return state_ok
         
     def read_TimeBetweenChanging(self, attr):
         self.debug_stream("In read_TimeBetweenChanging()")
@@ -1144,7 +1350,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if attr==PyTango.AttReqType.READ_REQ:
             state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
                 PyTango.DevState.INIT,
-                PyTango.DevState.OFF])
+                PyTango.DevState.OFF,
+                PyTango.DevState.STANDBY])
         else:
             state_ok = not(self.get_state() in [])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Histogram_allowed) ENABLED START -----#
@@ -1186,7 +1393,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
             PyTango.DevState.ON,
-            PyTango.DevState.RUNNING])
+            PyTango.DevState.RUNNING,
+            PyTango.DevState.STANDBY])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_On_allowed) ENABLED START -----#
         
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_On_allowed
@@ -1209,7 +1417,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
             PyTango.DevState.OFF,
-            PyTango.DevState.RUNNING])
+            PyTango.DevState.RUNNING,
+            PyTango.DevState.STANDBY])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Off_allowed) ENABLED START -----#
         
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Off_allowed
@@ -1232,7 +1441,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
             PyTango.DevState.OFF,
-            PyTango.DevState.RUNNING])
+            PyTango.DevState.RUNNING,
+            PyTango.DevState.STANDBY])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Start_allowed) ENABLED START -----#
         
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Start_allowed
@@ -1255,7 +1465,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
             PyTango.DevState.OFF,
-            PyTango.DevState.ON])
+            PyTango.DevState.ON,
+            PyTango.DevState.STANDBY])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Stop_allowed) ENABLED START -----#
         
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Stop_allowed
@@ -1278,7 +1489,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
             PyTango.DevState.OFF,
-            PyTango.DevState.RUNNING])
+            PyTango.DevState.RUNNING,
+            PyTango.DevState.STANDBY])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Acquire_allowed) ENABLED START -----#
         
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Acquire_allowed
@@ -1301,7 +1513,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         state_ok = not(self.get_state() in [PyTango.DevState.FAULT,
             PyTango.DevState.INIT,
             PyTango.DevState.OFF,
-            PyTango.DevState.ON])
+            PyTango.DevState.ON,
+            PyTango.DevState.STANDBY])
         #----- PROTECTED REGION ID(PH_PhotonCounter.is_Abort_allowed) ENABLED START -----#
         
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.is_Abort_allowed
