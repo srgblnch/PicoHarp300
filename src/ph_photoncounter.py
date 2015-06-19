@@ -54,14 +54,17 @@ import PyTango
 import sys
 # Add additional import
 #----- PROTECTED REGION ID(PH_PhotonCounter.additionnal_import) ENABLED START -----#
-import PicoHarp
+
+import math
 import numpy as np
-from types import StringType #used for Exec()
+import PicoHarp
 import pprint #used for Exec()
-import traceback
+from usbreset import usbreset
 import threading
 import time
-import math
+import traceback
+from types import StringType #used for Exec()
+
 
 TIME_BETWEEN_CHANGING = 0.1 #s
 DEFAULT_TIME_BETWEEN_CHANGING = TIME_BETWEEN_CHANGING
@@ -261,6 +264,13 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if not hasattr(self,'_communicationsThread'):
             self._communicationsThread = \
                            threading.Thread(target=self._prepareCommunications)
+
+    def _launchThread(self):
+        try:
+            if not self._communicationsThread.isAlive():
+                self._communicationsThread.start()
+        except RuntimeError,e:
+            self.warn_stream("Error launching thread because: %s"%(e))
         
     def _prepareDiscoverInstrument(self):
         if not hasattr(self,'_discoverer'):
@@ -276,6 +286,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 while not self.discover():
                     time.sleep(1)
                     self.warn_stream("Discoverer didn't find the instrument")
+        if hasattr(self,'_instrument') and self._instrument == None:
             self.connect()
             self._poststandby()
             
@@ -283,7 +294,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._checkSyncDivider()
         self._checkZeroCrossChannels()
         self._checkLevelChannels()
-        self._checkResolutionAndBinnig()
+        self._checkResolutionAndBinning()
         self._checkOffset()
         self._checkOverflowStopper()
         self._checkAcquisitionTime()
@@ -319,7 +330,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                               %(self.attr_LevelCh1_read))
             self._instrument.setInputCFD(1,\
                                           CFDLevel=self.attr_LevelCh1_read)
-    def _checkResolutionAndBinnig(self):
+    def _checkResolutionAndBinning(self):
         if self.attr_Resolution_read != self._instrument.getResolution():
             try:
                 binning = \
@@ -410,10 +421,24 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 self.set_state(PyTango.DevState.ALARM)
             else:
                 self.set_state(endState)
+        except IOError,e:
+            msg = "Catch IOError exception: %s"%(e)
+            self.error_stream(msg)
+            #traceback.print_exc()
+            #TODO: try to recover this exception
+            if e.errno in [PicoHarp.ErrorCodes.USB_HISPEED_FAIL,
+                           PicoHarp.ErrorCodes.USB_VCMD_FAIL]:
+                self.info_stream("e.errno = %r, e.strerror = %r"
+                                 %(e.errno,e.strerror))
+                usb = usbreset()
+                usb.unbind()
+                usb.bind()
+            self.set_state(PyTango.DevState.FAULT)
+            self.set_status(msg)
+            self._acquisitionStop.set()
         except Exception,e:
             msg = "Acquisition exception: %s"%(e)
             self.error_stream(msg)
-            traceback.print_exc()
             self.set_state(PyTango.DevState.FAULT)
             self.set_status(msg)
             self._acquisitionStop.set()
@@ -524,8 +549,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._prepareThreading()
         self._prepareDiscoverInstrument()
         self.set_state(PyTango.DevState.OFF)
-        if not self._communicationsThread.isAlive():
-            self._communicationsThread.start()
+        self._launchThread()
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.init_device
 
     def always_executed_hook(self):
