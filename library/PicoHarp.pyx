@@ -95,8 +95,100 @@ cdef extern from "phlib.h":
 cdef extern from "errorcodes.h":
     int ERROR_NONE
     int ERROR_DEVICE_OPEN_FAIL
+    int ERROR_DEVICE_BUSY
+    int ERROR_DEVICE_HEVENT_FAIL
+    int ERROR_DEVICE_CALLBSET_FAIL
+    int ERROR_DEVICE_BARMAP_FAIL
+    int ERROR_DEVICE_CLOSE_FAIL
+    int ERROR_DEVICE_RESET_FAIL
+    int ERROR_DEVICE_GETVERSION_FAIL
+    int ERROR_DEVICE_VERSION_MISMATCH
+    int ERROR_DEVICE_NOT_OPEN
+    int ERROR_DEVICE_LOCKED
+    int ERROR_INSTANCE_RUNNING
+    int ERROR_INVALID_ARGUMENT
+    int ERROR_INVALID_MODE
+    int ERROR_INVALID_OPTION
+    int ERROR_INVALID_MEMORY
+    int ERROR_INVALID_RDATA
+    int ERROR_NOT_INITIALIZED
+    int ERROR_NOT_CALIBRATED
+    int ERROR_DMA_FAIL
+    int ERROR_XTDEVICE_FAIL
+    int ERROR_FPGACONF_FAIL
+    int ERROR_IFCONF_FAIL
+    int ERROR_FIFORESET_FAIL
+    int ERROR_STATUS_FAIL
+    int ERROR_USB_GETDRIVERVER_FAIL
+    int ERROR_USB_DRIVERVER_MISMATCH
+    int ERROR_USB_GETIFINFO_FAIL
+    int ERROR_USB_HISPEED_FAIL
+    int ERROR_USB_VCMD_FAIL
+    int ERROR_USB_BULKRD_FAIL
+    int ERROR_HARDWARE_F01
+    int ERROR_HARDWARE_F02
+    int ERROR_HARDWARE_F03
+    int ERROR_HARDWARE_F04
+    int ERROR_HARDWARE_F05
+    int ERROR_HARDWARE_F06
+    int ERROR_HARDWARE_F07
+    int ERROR_HARDWARE_F08
+    int ERROR_HARDWARE_F09
+    int ERROR_HARDWARE_F10
+    int ERROR_HARDWARE_F11
+    int ERROR_HARDWARE_F12
+    int ERROR_HARDWARE_F13
+    int ERROR_HARDWARE_F14
+    int ERROR_HARDWARE_F15
 
-
+class ErrorCodes:
+    NONE = ERROR_NONE
+    DEVICE_OPEN_FAIL = ERROR_DEVICE_OPEN_FAIL
+    DEVICE_BUSY = ERROR_DEVICE_BUSY
+    DEVICE_HEVENT_FAIL = ERROR_DEVICE_HEVENT_FAIL
+    DEVICE_CALLBSET_FAIL = ERROR_DEVICE_CALLBSET_FAIL
+    DEVICE_BARMAP_FAIL = ERROR_DEVICE_BARMAP_FAIL
+    DEVICE_CLOSE_FAIL = ERROR_DEVICE_CLOSE_FAIL
+    DEVICE_RESET_FAIL = ERROR_DEVICE_RESET_FAIL
+    DEVICE_GETVERSION_FAIL = ERROR_DEVICE_GETVERSION_FAIL
+    DEVICE_VERSION_MISMATCH = ERROR_DEVICE_VERSION_MISMATCH
+    DEVICE_NOT_OPEN = ERROR_DEVICE_NOT_OPEN
+    DEVICE_LOCKED = ERROR_DEVICE_LOCKED
+    INSTANCE_RUNNING = ERROR_INSTANCE_RUNNING
+    INVALID_ARGUMENT = ERROR_INVALID_ARGUMENT
+    INVALID_MODE = ERROR_INVALID_MODE
+    INVALID_OPTION = ERROR_INVALID_OPTION
+    INVALID_MEMORY = ERROR_INVALID_MEMORY
+    INVALID_RDATA = ERROR_INVALID_RDATA
+    NOT_INITIALIZED = ERROR_NOT_INITIALIZED
+    NOT_CALIBRATED = ERROR_NOT_CALIBRATED
+    DMA_FAIL = ERROR_DMA_FAIL
+    XTDEVICE_FAIL = ERROR_XTDEVICE_FAIL
+    FPGACONF_FAIL = ERROR_FPGACONF_FAIL
+    IFCONF_FAIL = ERROR_IFCONF_FAIL
+    FIFORESET_FAIL = ERROR_FIFORESET_FAIL
+    STATUS_FAIL = ERROR_STATUS_FAIL
+    USB_GETDRIVERVER_FAIL = ERROR_USB_GETDRIVERVER_FAIL
+    USB_DRIVERVER_MISMATCH = ERROR_USB_DRIVERVER_MISMATCH
+    USB_GETIFINFO_FAIL = ERROR_USB_GETIFINFO_FAIL
+    USB_HISPEED_FAIL = ERROR_USB_HISPEED_FAIL
+    USB_VCMD_FAIL = ERROR_USB_VCMD_FAIL
+    USB_BULKRD_FAIL = ERROR_USB_BULKRD_FAIL
+    HARDWARE_F01 = ERROR_HARDWARE_F01
+    HARDWARE_F02 = ERROR_HARDWARE_F02
+    HARDWARE_F03 = ERROR_HARDWARE_F03
+    HARDWARE_F04 = ERROR_HARDWARE_F04
+    HARDWARE_F05 = ERROR_HARDWARE_F05
+    HARDWARE_F06 = ERROR_HARDWARE_F06
+    HARDWARE_F07 = ERROR_HARDWARE_F07
+    HARDWARE_F08 = ERROR_HARDWARE_F08
+    HARDWARE_F09 = ERROR_HARDWARE_F09
+    HARDWARE_F10 = ERROR_HARDWARE_F10
+    HARDWARE_F11 = ERROR_HARDWARE_F11
+    HARDWARE_F12 = ERROR_HARDWARE_F12
+    HARDWARE_F13 = ERROR_HARDWARE_F13
+    HARDWARE_F14 = ERROR_HARDWARE_F14
+    HARDWARE_F15 = ERROR_HARDWARE_F15
 
 def __version__():
     '''Library version with 4 fields: 'a.b.c-d'
@@ -388,7 +480,7 @@ class Instrument(Logger):
         '''
         err = PH_CloseDevice(self._devidx)
         if err != ERROR_NONE:
-            raise IOError("Close error (%d)"%(err))
+            raise IOError(err,"Close error (%d)"%(err))
         self.debug("Instrument connection closed.")
 
     def initialise(self):
@@ -401,7 +493,7 @@ class Instrument(Logger):
         '''
         err = PH_Initialize(self._devidx,self._mode)
         if err != ERROR_NONE:
-            raise IOError("Init error (%d): %s"%(err,self.interpretError(err)))
+            raise IOError(err,"Init error (%d): %s"%(err,self.interpretError(err)))
         self.debug("Instrument initialised.")
         return self
 
@@ -413,7 +505,7 @@ class Instrument(Logger):
         err = PH_GetHardwareInfo(self._devidx,self._HW_Model,
                                  self._HW_PartNo,self._HW_Version)
         if err != ERROR_NONE:
-            raise IOError("Getting hardware info error (%d): %s"
+            raise IOError(err,"Getting hardware info error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("Found Model %s Partnum %s Version %s"%(self._HW_Model,
                                                            self._HW_PartNo,
@@ -428,7 +520,7 @@ class Instrument(Logger):
         '''
         err = PH_Calibrate(self._devidx)
         if err != ERROR_NONE:
-            raise IOError("Calibration error (%d): %s"
+            raise IOError(err,"Calibration error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("Instrument calibration done.")
         return self
@@ -481,7 +573,7 @@ class Instrument(Logger):
         else:
             err = PH_SetSyncDiv(self._devidx,0)
         if err != ERROR_NONE:
-            raise IOError("SetSyncDiv error (%d): %s"
+            raise IOError(err,"SetSyncDiv error (%d): %s"
                           %(err,self.interpretError(err)))
         self._SyncDivider = syncDivider
         self.debug("SetSyncDiv has been set (%d)"%(self._SyncDivider))
@@ -545,7 +637,7 @@ class Instrument(Logger):
             raise ValueError("CFD zero cross must be below %d"%(ZCMAX))
         err = PH_SetInputCFD(self._devidx,channel,CFDLevel,CFDZeroCross)
         if err != ERROR_NONE:
-            raise IOError("setInputCFD error (%d): %s"
+            raise IOError(err,"setInputCFD error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("setInputCFD has been set for channel %d: "\
                    "(CFDLevel:%d,CFDZeroCross:%d)"
@@ -577,7 +669,7 @@ class Instrument(Logger):
             Binning = self._Binning
         err = PH_SetBinning(self._devidx,Binning)
         if err != ERROR_NONE:
-            raise IOError("SetBinning error (%d): %s"
+            raise IOError(err,"SetBinning error (%d): %s"
                           %(err,self.interpretError(err)))
         self._Binning = Binning
         self.debug("Binning = %d"%(self._Binning))
@@ -611,7 +703,7 @@ class Instrument(Logger):
             Offset = self._Offset
         err = PH_SetOffset(self._devidx,Offset)
         if err != ERROR_NONE:
-            raise IOError("SetOffset error (%d): %s"
+            raise IOError(err,"SetOffset error (%d): %s"
                           %(err,self.interpretError(err)))
         self._Offset = Offset
         self.debug("Offset = %d"%(self._Offset))
@@ -626,7 +718,7 @@ class Instrument(Logger):
         cdef int binsteps = BINSTEPSMAX
         err = PH_GetBaseResolution(self._devidx,&baseResolution,&binsteps)
         if err != ERROR_NONE:
-            raise IOError("GetBaseResolution error (%d): %s"
+            raise IOError(err,"GetBaseResolution error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("Base Resolution = %g"%(baseResolution))
         return baseResolution
@@ -639,7 +731,7 @@ class Instrument(Logger):
         cdef double resolution = 0.0
         err = PH_GetResolution(self._devidx,&resolution)
         if err != ERROR_NONE:
-            raise IOError("GetResolution error (%d): %s"
+            raise IOError(err,"GetResolution error (%d): %s"
                           %(err,self.interpretError(err)))
         self._Resolution = resolution
         self.debug("Resolution = %g"%(self._Resolution))
@@ -655,7 +747,7 @@ class Instrument(Logger):
         cdef int countrate = 0
         err = PH_GetCountRate(self._devidx,channel,&countrate)
         if err != ERROR_NONE:
-            raise IOError("GetCountRate channel %d error (%d): %s"
+            raise IOError(err,"GetCountRate channel %d error (%d): %s"
                           %(channel,err,self.interpretError(err)))
         self._CountRate[channel] = countrate
         self.debug("CountRate[%d] = %d"%(channel,self._CountRate[channel]))
@@ -715,7 +807,7 @@ class Instrument(Logger):
                 raise ValueError("stop count must be below %d"%(HISTCHAN-1))
         err = PH_SetStopOverflow(self._devidx,stop,count)
         if err != ERROR_NONE:
-            raise IOError("SetStopOverflow error (%d): %s"
+            raise IOError(err,"SetStopOverflow error (%d): %s"
                           %(err,self.interpretError(err)))
         self._stop = stop
         self._stopCount = count
@@ -755,7 +847,7 @@ class Instrument(Logger):
             block = self._block
         err = PH_ClearHistMem(self._devidx,block)
         if err != ERROR_NONE:
-            raise IOError("ClearHistMem error (%d): %s"
+            raise IOError(err,"ClearHistMem error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("Histogram memory (block %d) clean"%(block))
         return self
@@ -796,7 +888,7 @@ class Instrument(Logger):
             raise ValueError("acq.time must be below %d"%(ACQTMAX))
         err = PH_StartMeas(self._devidx,AcquisitionTime)
         if err != ERROR_NONE:
-            raise IOError("StartMeas error (%d): %s"
+            raise IOError(err,"StartMeas error (%d): %s"
                           %(err,self.interpretError(err)))
         self._acquisitionTime = AcquisitionTime
         self.debug("start measurement")
@@ -812,7 +904,7 @@ class Instrument(Logger):
         cdef int ctcstatus=0
         err = PH_CTCStatus(self._devidx,&ctcstatus)
         if err < 0 and err != ERROR_NONE:
-            raise IOError("CTCStatus error (%d): %s"
+            raise IOError(err,"CTCStatus error (%d): %s"
                           %(err,self.interpretError(err)))
         #self.debug("counter status = %d"%(ctcstatus))
         return ctcstatus
@@ -823,7 +915,7 @@ class Instrument(Logger):
         '''
         err = PH_StopMeas(self._devidx)
         if err != ERROR_NONE:
-            raise IOError("StopMeas error (%d): %s"
+            raise IOError(err,"StopMeas error (%d): %s"
                           %(err,self.interpretError(err)))
         self.debug("stop measurement")
         return self
@@ -855,7 +947,7 @@ class Instrument(Logger):
             return [None]*HISTCHAN
         err = PH_GetHistogram(self._devidx,counts,block)
         if err != ERROR_NONE:
-            raise IOError("GetHistogram error (%d): %s"
+            raise IOError(err,"GetHistogram error (%d): %s"
                           %(err,self.interpretError(err)))
         for i in xrange(len(self._counts)):
             self._counts[i] = counts[i]
@@ -887,7 +979,7 @@ class Instrument(Logger):
         cdef int flags = 0
         err = PH_GetFlags(self._devidx,&flags)
         if err != ERROR_NONE:
-            raise IOError("GetFlags error (%d): %s"
+            raise IOError(err,"GetFlags error (%d): %s"
                           %(err,self.interpretError(err)))
         self._flags = flags
         self.debug("Flags: %s"%(bin(self._flags)))
@@ -908,7 +1000,7 @@ class Instrument(Logger):
         cdef double elapsed
         err = PH_GetElapsedMeasTime(self._devidx,&elapsed)
         if err != ERROR_NONE:
-            raise IOError("getElapsedMeasTime error (%d): %s"
+            raise IOError(err,"getElapsedMeasTime error (%d): %s"
                           %(err,self.interpretError(err)))
         return elapsed
     
@@ -917,7 +1009,7 @@ class Instrument(Logger):
         cdef int warnings
         err = PH_GetWarnings(self._devidx,&warnings)
         if err != ERROR_NONE:
-            raise IOError("getWarnings error (%d): %s"
+            raise IOError(err,"getWarnings error (%d): %s"
                           %(err,self.interpretError(err)))
         return warnings
     def getWarningsText(self,warnings=None):
@@ -926,14 +1018,14 @@ class Instrument(Logger):
         text = " "*16384
         err = PH_GetWarningsText(self._devidx,text,warnings)
         if err != ERROR_NONE:
-            raise IOError("getWarnings error for warning %d (%d): %s"
+            raise IOError(err,"getWarnings error for warning %d (%d): %s"
                           %(warnings,err,self.interpretError(err)))
         return __strcut(text)
     def getHardwareDebugInfo(self):
         debuginfo = " "*16384
         err = PH_GetHardwareDebugInfo(self._devidx,debuginfo)
         if err != ERROR_NONE:
-            raise IOError("getHardwareDebugInfo error (%d): %s"
+            raise IOError(err,"getHardwareDebugInfo error (%d): %s"
                           %(err,self.interpretError(err)))
         return __strcut(debuginfo)
 
