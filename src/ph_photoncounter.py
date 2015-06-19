@@ -310,15 +310,15 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         ZeroCross,level = self._instrument.getInputCFD(0)
         if self.attr_LevelCh0_read != level:
             self.debug_stream("Appyling stored LevelCh0 = %g"
-                              %(self.attr_ZeroCrossCh0_read))
+                              %(self.attr_LevelCh0_read))
             self._instrument.setInputCFD(0,\
-                                          CFDLevel=self.attr_ZeroCrossCh0_read)
+                                          CFDLevel=self.attr_LevelCh0_read)
         ZeroCross,level = self._instrument.getInputCFD(1)
         if self.attr_LevelCh1_read != level:
             self.debug_stream("Appyling stored LevelCh1 = %g"
-                              %(self.attr_ZeroCrossCh1_read))
+                              %(self.attr_LevelCh1_read))
             self._instrument.setInputCFD(1,\
-                                          CFDLevel=self.attr_ZeroCrossCh1_read)
+                                          CFDLevel=self.attr_LevelCh1_read)
     def _checkResolutionAndBinnig(self):
         if self.attr_Resolution_read != self._instrument.getResolution():
             try:
@@ -1715,6 +1715,7 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
                 'label': "Resolution",
                 'unit': "ps",
                 'description': "Acquisition resolution.",
+                'Memorized':"true_without_hard_applied"
             } ],
         'Binning':
             [[PyTango.DevUShort,
