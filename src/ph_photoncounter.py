@@ -59,7 +59,8 @@ import math
 import numpy as np
 import PicoHarp
 import pprint #used for Exec()
-from usbreset import usbreset
+from subprocess import call
+#from usbreset import usbreset
 import threading
 import time
 import traceback
@@ -252,6 +253,33 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if hasattr(self,'_instrument') and self._instrument != None:
             return True
         return False
+    
+    def _usbRecovery(self):
+        #usb = usbreset()
+        #usb.unbind()
+        #usb.bind()
+        try:
+            #FIXME: unhardcode!
+            call(["/homelocal/sicilia/local/tmp/usbreset.sh"])
+        except Exception,e:
+            self.error_stream("Exception trying to recover from usb issue.")
+            self.set_status(PyTango.DevState.FAULT)
+            self.set_status("Fatal error. Cannot recover USB communications.",
+                            important=True)
+        else:
+            self.disconnect()
+            self.set_state(PyTango.DevState.INIT)
+            if self._communicationsThread.isAlive():
+                if self._communicationsThread.join(0.1):#s
+                    try:
+                        self._communicationsThread.exit()
+                    except Exception,e:
+                        self.warn_stream("Couldn't finish the "\
+                                         "communication thread")
+            self._communicationsThread = None
+            self._prepareThreading()
+            self._prepareDiscoverInstrument()
+            self._launchThread()
     #---- Done instrument connectivity region
     
     #---- Threaded acquisition region
@@ -261,7 +289,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if not hasattr(self,'_acquisitionStop'):
             self._acquisitionStop = threading.Event()
             self._acquisitionStop.clear()
-        if not hasattr(self,'_communicationsThread'):
+        if not hasattr(self,'_communicationsThread') or \
+        self._communicationsThread == None:
             self._communicationsThread = \
                            threading.Thread(target=self._prepareCommunications)
 
@@ -428,11 +457,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             #TODO: try to recover this exception
             if e.errno in [PicoHarp.ErrorCodes.USB_HISPEED_FAIL,
                            PicoHarp.ErrorCodes.USB_VCMD_FAIL]:
-                self.info_stream("e.errno = %r, e.strerror = %r"
+                self.error_stream("Catch an error with the USB control "\
+                                 "(e.errno = %r, e.strerror = %r). "\
+                                 "Let's try if it can be recovered."
                                  %(e.errno,e.strerror))
-                usb = usbreset()
-                usb.unbind()
-                usb.bind()
+                self._usbRecovery()
+                return
             self.set_state(PyTango.DevState.FAULT)
             self.set_status(msg)
             self._acquisitionStop.set()
