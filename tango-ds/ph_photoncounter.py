@@ -255,12 +255,13 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         return False
     
     def _usbRecovery(self):
-        #usb = usbreset()
-        #usb.unbind()
-        #usb.bind()
         try:
-            #FIXME: unhardcode!
-            call(["/homelocal/sicilia/local/tmp/usbreset.sh"])
+            cmd = "sudo %s/%s"%(self.usbResetPath,self.usbResetScriptName)
+            self.warn_stream("Calling special script to try to recover "\
+                             "usb! (%s)"%(cmd))
+            exitCode = call([cmd])
+            self.info_stream("USB recovery script called and exit code %d"
+                             %(exitCode))
         except Exception,e:
             self.error_stream("Exception trying to recover from usb issue.")
             self.set_status(PyTango.DevState.FAULT)
@@ -1654,6 +1655,14 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             [PyTango.DevBoolean,
             "Property to configure the device to, instead of use an instrument, simulate it.",
             [False]],
+        'usbResetPath':
+            [PyTango.DevString,
+            "Path to where the script to reset the usb ports has been placed",
+            [] ],
+        'usbResetScriptName':
+            [PyTango.DevString,
+            "Name of the script to be called to recover to the speed exception in the usb",
+            ["usbreset.sh"] ],
         }
 
 

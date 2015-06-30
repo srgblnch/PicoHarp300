@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ASCII"?>
 <pogoDsl:PogoSystem xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:pogoDsl="http://www.esrf.fr/tango/pogo/PogoDsl">
   <classes name="PH_PhotonCounter" pogoRevision="8.4">
-    <description description="This device has been conceived to introduce a PicoHarp300 instrument &#xA;with in the tango control system.&#xA;&#xA;This device is not using directly the manufacturer's library. In this repository&#xA;you can find a cython extension to bind their library to python." title="PicoHarp photon counter" sourcePath="/home/serguei/src/Diagnostics/PicoHarp300/src" language="Python" filestogenerate="XMI   file,Code files,html Pages" hasMandatoryProperty="true" hasConcreteProperty="true" hasAbstractCommand="false" hasAbstractAttribute="false" descriptionHtmlExists="false">
+    <description description="This device has been conceived to introduce a PicoHarp300 instrument &#xA;with in the tango control system.&#xA;&#xA;This device is not using directly the manufacturer's library. In this repository&#xA;you can find a cython extension to bind their library to python." title="PicoHarp photon counter" sourcePath="/home/serguei/src/Diagnostics/PicoHarp300/tango-ds" language="Python" filestogenerate="XMI   file,Code files,html Pages" hasMandatoryProperty="true" hasConcreteProperty="true" hasAbstractCommand="false" hasAbstractAttribute="false" descriptionHtmlExists="false">
       <inheritances classname="Device_Impl" sourcePath=""/>
       <identification contact="at cells.es - sblanch" author="sblanch" emailDomain="cells.es" classFamily="Instrumentation" siteSpecific="" platform="Unix Like" bus="USB" manufacturer="PicoQuant GmbH" reference="PicoHarp300"/>
     </description>
@@ -13,6 +13,15 @@
       <type xsi:type="pogoDsl:BooleanType"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <DefaultPropValue>False</DefaultPropValue>
+    </deviceProperties>
+    <deviceProperties name="usbResetPath" mandatory="true" description="Path to where the script to reset the usb ports has been placed">
+      <type xsi:type="pogoDsl:StringType"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </deviceProperties>
+    <deviceProperties name="usbResetScriptName" description="Name of the script to be called to recover to the speed exception in the usb">
+      <type xsi:type="pogoDsl:StringType"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <DefaultPropValue>usbreset.sh</DefaultPropValue>
     </deviceProperties>
     <commands name="State" description="This command gets the device state (stored in its device_state data member) and returns it to the caller." execMethod="dev_state" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="none">
