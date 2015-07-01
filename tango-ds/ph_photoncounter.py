@@ -221,6 +221,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 self.set_status(msg)
                 return False
         self.set_state(PyTango.DevState.STANDBY)
+        self.set_status("Instrument %s discovered."%(self.SerialNumber))
         return True
     def connect(self):
         try:
@@ -230,6 +231,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             else:
                 self._instrument = PicoHarp.InstrumentSimulator(debug=True)
             self.set_state(PyTango.DevState.ON)
+            self.set_status("Connected to the instrument.")
             self.fireEventsList([
                      ['InstrumentModel',self._instrument.__model__],
                      ['InstrumentPartnum',self._instrument.__partnum__],
@@ -246,9 +248,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 self._instrument.abort()
             del self._instrument
             self._instrument = None
+        if hasattr(self,'_discoverer') and self._discoverer != None:
+            del self._discoverer
         if not self.get_state() in [PyTango.DevState.OFF,
                                     PyTango.DevState.FAULT]:
             self.set_state(PyTango.DevState.OFF)
+            self.set_status("Disconnected from the instrument...")
     def isConnected(self):
         if hasattr(self,'_instrument') and self._instrument != None:
             return True
@@ -256,20 +261,25 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     
     def _usbRecovery(self):
         try:
-            cmd = "sudo %s/%s"%(self.usbResetPath,self.usbResetScriptName)
+            self.set_state(PyTango.DevState.INIT)
+            self.set_status("Initializing the usb connection...")
+            cmd = "%s/%s"%(self.usbResetPath,self.usbResetScriptName)
             self.warn_stream("Calling special script to try to recover "\
                              "usb! (%s)"%(cmd))
-            exitCode = call([cmd])
+            time.sleep(1)
+            exitCode = call(['sudo',cmd])
             self.info_stream("USB recovery script called and exit code %d"
                              %(exitCode))
+            time.sleep(1)
         except Exception,e:
-            self.error_stream("Exception trying to recover from usb issue.")
-            self.set_status(PyTango.DevState.FAULT)
+            self.error_stream("Exception trying to recover from usb issue: %s"%(e))
+            traceback.print_exc()
+            self.set_state(PyTango.DevState.FAULT)
             self.set_status("Fatal error. Cannot recover USB communications.",
                             important=True)
         else:
             self.disconnect()
-            self.set_state(PyTango.DevState.INIT)
+            ## FIXME: improve this thread cleaning
             if self._communicationsThread.isAlive():
                 if self._communicationsThread.join(0.1):#s
                     try:
@@ -277,7 +287,16 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                     except Exception,e:
                         self.warn_stream("Couldn't finish the "\
                                          "communication thread")
+            if self._acquisitionThread.isAlive():
+                try:
+                    self._acquisitionStop.set()
+                    if self._acquisitionThread.join(1):#s
+                        self._acquisitionThread.exit()
+                except Exception,e:
+                        self.warn_stream("Couldn't finish the "\
+                                         "acquisition thread")
             self._communicationsThread = None
+            self._acquisitionThread = None
             self._prepareThreading()
             self._prepareDiscoverInstrument()
             self._launchThread()
@@ -316,6 +335,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 while not self.discover():
                     time.sleep(1)
                     self.warn_stream("Discoverer didn't find the instrument")
+        if hasattr(self,'_discoverer') and self._discoverer == None:
+            self.discover()
         if hasattr(self,'_instrument') and self._instrument == None:
             self.connect()
             self._poststandby()
@@ -328,6 +349,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._checkOffset()
         self._checkOverflowStopper()
         self._checkAcquisitionTime()
+        if self.AutoStart:
+            self.Start()
         
     def _checkSyncDivider(self):
         if self.attr_SyncDivider_read != self._instrument.getSyncDivider():
@@ -433,6 +456,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         
     def _doSingleAcq(self,endState=PyTango.DevState.ON):
         try:
+            if not self._instrument:
+                return
             self.set_state(PyTango.DevState.RUNNING)
             self._instrument.acquire(async=True)
             while not self._instrument.isAsyncAcquisitionDone():
@@ -463,10 +488,10 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                                  "Let's try if it can be recovered."
                                  %(e.errno,e.strerror))
                 self._usbRecovery()
-                return
-            self.set_state(PyTango.DevState.FAULT)
-            self.set_status(msg)
-            self._acquisitionStop.set()
+            else:
+                self.set_state(PyTango.DevState.FAULT)
+                self.set_status(msg)
+                self._acquisitionStop.set()
         except Exception,e:
             msg = "Acquisition exception: %s"%(e)
             self.error_stream(msg)
@@ -1663,6 +1688,10 @@ class PH_PhotonCounterClass(PyTango.DeviceClass):
             [PyTango.DevString,
             "Name of the script to be called to recover to the speed exception in the usb",
             ["usbreset.sh"] ],
+        'AutoStart':
+            [PyTango.DevBoolean,
+            "Property to setup the behaviour of the device when it is launched",
+            [False]],
         }
 
 
