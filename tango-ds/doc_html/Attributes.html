@@ -1,0 +1,287 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title> PH_PhotonCounter Tango Class Attributes </title>
+</head>
+<body text="Black" bgcolor="White" link="Blue" vlink="Purple" alink="Red">
+<br><br><br><br>
+<Table Border=2 Cellpadding=3 CELLSPACING=0>
+	<tr bgcolor="#CCCCFF" class="TableHeadingColor">
+	<td colspan=8> <font size=+1> <center><b> PH_PhotonCounter Class Attributes </b></font></center></td>
+	<tr bgcolor="#CCCCFF" class="TableHeadingColor">
+		<td> <center><b> Name </b></center> </td>
+		<td> <center><b> Inherited </b></center> </td>
+		<td> <center><b> Abstract </b></center> </td>
+		<td> <center><b> Attr. type </b></center> </td>
+		<td> <center><b> R/W type </b></center> </td>
+		<td> <center><b> Data type </b></center> </td>
+		<td> <center><b> Level </b></center> </td>
+		<td> <center><b> Description </b></center> </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrInstrumentModel.html"> InstrumentModel </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_STRING </td>
+		<td> OPERATOR </td>
+		<td> Name given by the instrument about its model. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrInstrumentPartnum.html"> InstrumentPartnum </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_STRING </td>
+		<td> OPERATOR </td>
+		<td> Name given by the instrument about its partnum. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrInstrumentVersion.html"> InstrumentVersion </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_STRING </td>
+		<td> OPERATOR </td>
+		<td> Firmware version of the instrument. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrSyncDivider.html"> SyncDivider </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_USHORT </td>
+		<td> OPERATOR </td>
+		<td> Programable divider of the sync input. This allows to reduce the sync input rate. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrZeroCrossCh0.html"> ZeroCrossCh0 </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_SHORT </td>
+		<td> OPERATOR </td>
+		<td> Zero cross level of the Constant Fraction Discriminator (CFD) for the channel 0 </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrZeroCrossCh1.html"> ZeroCrossCh1 </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_SHORT </td>
+		<td> OPERATOR </td>
+		<td> Zero cross level of the Constant Fraction Discriminator (CFD) for the channel 1 </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrLevelCh0.html"> LevelCh0 </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_SHORT </td>
+		<td> OPERATOR </td>
+		<td> Discriminator level of the Constant Fraction Discriminator (CFD) for the channel 0 </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrLevelCh1.html"> LevelCh1 </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_SHORT </td>
+		<td> OPERATOR </td>
+		<td> Discriminator level of the Constant Fraction Discriminator (CFD) for the channel 1 </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrResolution.html"> Resolution </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_DOUBLE </td>
+		<td> OPERATOR </td>
+		<td> Acquisition resolution. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrBinning.html"> Binning </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_USHORT </td>
+		<td> OPERATOR </td>
+		<td> To configure the resolution. Steps from 0 to 7 means resolutions 4, 8, 16, 32, ..., 512 ps. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrBaseResolution.html"> BaseResolution </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_DOUBLE </td>
+		<td> OPERATOR </td>
+		<td> The very basic resolution where no binning can be applied. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrOffset.html"> Offset </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_SHORT </td>
+		<td> OPERATOR </td>
+		<td> Delay the acquisition window relatively to the sync frame. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrCountRateCh0.html"> CountRateCh0 </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_LONG </td>
+		<td> OPERATOR </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrCountRateCh1.html"> CountRateCh1 </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_LONG </td>
+		<td> OPERATOR </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrOverflowStopper.html"> OverflowStopper </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_BOOLEAN </td>
+		<td> EXPERT </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrOverflowStopperThreshold.html"> OverflowStopperThreshold </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_ULONG </td>
+		<td> EXPERT </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrAcquisitionTime.html"> AcquisitionTime </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_DOUBLE </td>
+		<td> OPERATOR </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrFlags.html"> Flags </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_SHORT </td>
+		<td> EXPERT </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrIntegralCount.html"> IntegralCount </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_LONG64 </td>
+		<td> OPERATOR </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrHistogramMaxValue.html"> HistogramMaxValue </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_LONG </td>
+		<td> OPERATOR </td>
+		<td> From read histogram, its maximum value </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrElapsedMeasTime.html"> ElapsedMeasTime </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_DOUBLE </td>
+		<td> OPERATOR </td>
+		<td>  </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrWarnings.html"> Warnings </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_STRING </td>
+		<td> OPERATOR </td>
+		<td> Human readable text from the instrument warning codes. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrHardwareDebugInfo.html"> HardwareDebugInfo </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ </td>
+		<td> Tango::DEV_STRING </td>
+		<td> EXPERT </td>
+		<td> Instrument debug information. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrTimeBetweenChanging.html"> TimeBetweenChanging </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_DOUBLE </td>
+		<td> EXPERT </td>
+		<td> Internal parameter of the device to configure the reading frequency to the instrument for intermediate values. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrTimeHoldingAlarm.html"> TimeHoldingAlarm </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Scalar </td>
+		<td> READ_WRITE </td>
+		<td> Tango::DEV_DOUBLE </td>
+		<td> EXPERT </td>
+		<td> Internal parameter to configure how much time the alarm state is hold to allow the user to record the information. </td>
+	</tr>
+	<tr>
+		<td> <a href="AttrHistogram.html"> Histogram </a> </td>
+		<td> false </td>
+		<td> false </td>
+		<td> Spectrum </td>
+		<td> READ </td>
+		<td> Tango::DEV_LONG </td>
+		<td> OPERATOR </td>
+		<td>  </td>
+	</tr>
+</table>
+<br><br>
+<hr>
+<br><br>
+<font size="+1"><u><b> There is no dynamic attribute defined. </b></u></font>
+</body>
+</html>
