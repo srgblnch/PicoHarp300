@@ -9,7 +9,8 @@ if [[ $EUID != 0 ]] ; then
   exit 1
 fi
 
-for xhci in /sys/bus/pci/drivers/?hci_hcd ; do
+#for xhci in /sys/bus/pci/drivers/?hci_hcd ; do
+for xhci in /sys/bus/pci/drivers/ehci_hcd ; do
 
   if ! cd $xhci ; then
     echo Weird error. Failed to change directory to $xhci
