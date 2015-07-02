@@ -280,23 +280,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         else:
             self.disconnect()
             ## FIXME: improve this thread cleaning
-            if self._communicationsThread.isAlive():
-                if self._communicationsThread.join(0.1):#s
-                    try:
-                        self._communicationsThread.exit()
-                    except Exception,e:
-                        self.warn_stream("Couldn't finish the "\
-                                         "communication thread")
-            if self._acquisitionThread.isAlive():
-                try:
-                    self._acquisitionStop.set()
-                    if self._acquisitionThread.join(1):#s
-                        self._acquisitionThread.exit()
-                except Exception,e:
-                        self.warn_stream("Couldn't finish the "\
-                                         "acquisition thread")
-            self._communicationsThread = None
-            self._acquisitionThread = None
+            self._cleanThreading()
             self._prepareThreading()
             self._prepareDiscoverInstrument()
             self._launchThread()
@@ -481,8 +465,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.error_stream(msg)
             #traceback.print_exc()
             #TODO: try to recover this exception
-            if e.errno in [PicoHarp.ErrorCodes.USB_HISPEED_FAIL,
-                           PicoHarp.ErrorCodes.USB_VCMD_FAIL]:
+            if e.errno in [PicoHarp.ErrorCodes.USB_GETDRIVERVER_FAIL,
+                           PicoHarp.ErrorCodes.USB_DRIVERVER_MISMATCH,
+                           PicoHarp.ErrorCodes.USB_GETIFINFO_FAIL,
+                           PicoHarp.ErrorCodes.USB_HISPEED_FAIL,
+                           PicoHarp.ErrorCodes.USB_VCMD_FAIL,
+                           PicoHarp.ErrorCodes.USB_BULKRD_FAIL]:
                 self.error_stream("Catch an error with the USB control "\
                                  "(e.errno = %r, e.strerror = %r). "\
                                  "Let's try if it can be recovered."
@@ -515,6 +503,24 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 time.sleep(self.getTimeHoldingAlarm())
         if self.get_state() != PyTango.DevState.FAULT:
             self.set_state(PyTango.DevState.ON)
+    def _cleanThreading(self):
+        if self._communicationsThread.isAlive():
+            if self._communicationsThread.join(0.1):#s
+                try:
+                    self._communicationsThread.exit()
+                except Exception,e:
+                    self.warn_stream("Couldn't finish the "\
+                                     "communication thread")
+        if self._acquisitionThread.isAlive():
+            try:
+                self._acquisitionStop.set()
+                if self._acquisitionThread.join(1):#s
+                    self._acquisitionThread.exit()
+            except Exception,e:
+                    self.warn_stream("Couldn't finish the "\
+                                     "acquisition thread")
+        self._communicationsThread = None
+        self._acquisitionThread = None
     #---- Done threaded acquisition region
     
     #---- Dynamic attributes region
@@ -567,6 +573,9 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.attr_TimeHoldingAlarm_read = 0.0
         self.attr_Histogram_read = [0]
         #----- PROTECTED REGION ID(PH_PhotonCounter.init_device) ENABLED START -----#
+        if self.get_state() == PyTango.DevState.FAULT:
+            self.disconnect()
+            self._cleanThreading()
         self.set_change_event('State', True, False)
         self.set_change_event('Status', True, False)
         self.set_state(PyTango.DevState.INIT)
