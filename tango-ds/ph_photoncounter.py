@@ -1253,7 +1253,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         #----- PROTECTED REGION ID(PH_PhotonCounter.Flags_read) ENABLED START -----#
         try:
             self.attr_Flags_read = self._instrument.getFlags()
-            atrt.set_value(self.attr_Flags_read)
+            attr.set_value(self.attr_Flags_read)
         except Exception,e:
             self.set_status("Exception with Flags: %s"%e, important=True)
             self.set_state(PyTango.DevState.FAULT)
