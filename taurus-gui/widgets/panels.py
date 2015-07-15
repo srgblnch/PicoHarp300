@@ -28,6 +28,7 @@
 
 #TODO: instrument warnings text messages
 
+from taurus.external.qt import Qt#,QtCore
 from taurus.qt.qtgui.panel import TaurusCommandsForm
 
 class PhCtCommands(TaurusCommandsForm):
