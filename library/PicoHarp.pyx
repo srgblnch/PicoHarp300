@@ -32,7 +32,7 @@
 
 from version import version,BUILD_VERSION,REVISION_VERSION
 from time import sleep
-from datetime import datetime
+from datetime import datetime,timedelta
 cimport cython
 #from libc.stdlib cimport calloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
@@ -71,7 +71,6 @@ class Logger:
     def _threadId(self):
         return currentThread().getName()
     def _print(self,msg,type):
-        #when = time.strftime("%Y-%m-%d %H:%M:%S")
         when = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         print("%10s\t%s\t%s\t%s\t%s"%(self._threadId,type,when,self._name,msg))
     def error(self,msg):
@@ -1358,7 +1357,7 @@ class InstrumentSimulator(Instrument):
            Unit: ms
         '''
         if AcquisitionTime < ACQTMIN:
-            raise ValueError("acq.time must be above %d"%(ACQTMIN))
+            raise ValueError("acq.time must be above %d (%d)"%(ACQTMIN,AcquisitionTime))
         if AcquisitionTime > ACQTMAX:
             raise ValueError("acq.time must be below %d"%(ACQTMAX))
         self._acquisitionTime = AcquisitionTime
@@ -1376,8 +1375,8 @@ class InstrumentSimulator(Instrument):
         if AcquisitionTime > ACQTMAX:
             raise ValueError("acq.time must be below %d"%(ACQTMAX))
         self._acquisitionTime = AcquisitionTime
-        self._startMeasTime = datetime.datetime.now()
-        self.debug("start measurement")
+        self._startMeasTime = datetime.now()
+        self.debug("start measurement (%s)"%(self._startMeasTime))
         return self
     
     def getCounterStatus(self):
@@ -1388,8 +1387,6 @@ class InstrumentSimulator(Instrument):
            - >0: acquisition has ended.
         '''
         if self.getElapsedMeasTime() >= self._acquisitionTime:
-        #if datetime.datetime.now() >= \
-        #                  self._startMeasTime + (self._acquisitionTime/1000.):
             self.getHistogram()
             return 1
         else:
@@ -1466,8 +1463,10 @@ class InstrumentSimulator(Instrument):
            currently acquiring.
         '''
         if not self._startMeasTime == None:
-            elapsed = (datetime.now() - self._startMeasTime)*1e3
-            self.debug("Measuring since %g"%(elapsed))
+            self.warning("now %s and start %s"%(datetime.now(),self._startMeasTime))
+            elapsed = \
+            (datetime.now() - self._startMeasTime).total_seconds()*1e3
+            self.debug("Measuring since %s"%(elapsed))
             return elapsed
         else:
             return 0
