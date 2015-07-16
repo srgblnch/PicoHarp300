@@ -333,39 +333,45 @@ class Instrument(Logger):
     def __init__(self,devidx,mode=MODE_HIST,divider=1,binning=0,offset=0,
                  acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  stop=True,stopCount=HISTCHAN-1,debug=False):
-        Logger.__init__(self, debug)
-        self._name = "Instrument%d"%devidx
-        self._devidx = devidx
-        if mode != MODE_HIST:
-            raise NotImplementedError("Only histogram mode supported")
-        self._mode = mode
-        self.initialise()
-        self._HW_Model = " "*16
-        self._HW_PartNo = " "*8
-        self._HW_Version = " "*8
-        self.__getHardwareInfo()
-        self.__calibrate()
-        #configurable parameters
-        self._SyncDivider = divider
-        self._CFDLevel = CFDLevels
-        self._CFDZeroCross = CFDZeroCross
-        self._Binning = binning
-        self._Offset = offset
-        self._acquisitionTime = acqTime#ms
-        self._block = block
-        self._stop = stop
-        self._stopCount = stopCount
-        #readonly parameters
-        self._Resolution = 0.0
-        #outputs
-        self._CountRate = [0,0]
-        self._counts = [0]*HISTCHAN
-        self._flags = 0
-        self._integralCount = 0.0
-        self.prepare()
-        self._thread = None
-        self._acqAbort = Event()
-        self._acqAbort.clear()
+        #super doesn't work!
+        #super(Instrument,self).__init__(debug)
+        try:
+            Logger.__init__(self,debug)
+            self._name = "Instrument%d"%devidx
+            self._devidx = devidx
+            if mode != MODE_HIST:
+                raise NotImplementedError("Only histogram mode supported")
+            self._mode = mode
+            self.initialise()
+            self._HW_Model = " "*16
+            self._HW_PartNo = " "*8
+            self._HW_Version = " "*8
+            self.__getHardwareInfo()
+            self.__calibrate()
+            #configurable parameters
+            self._SyncDivider = divider
+            self._CFDLevel = CFDLevels
+            self._CFDZeroCross = CFDZeroCross
+            self._Binning = binning
+            self._Offset = offset
+            self._acquisitionTime = acqTime#ms
+            self._block = block
+            self._stop = stop
+            self._stopCount = stopCount
+            #readonly parameters
+            self._Resolution = 0.0
+            #outputs
+            self._CountRate = [0,0]
+            self._counts = [0]*HISTCHAN
+            self._flags = 0
+            self._integralCount = 0.0
+            self.prepare()
+            self._thread = None
+            self._acqAbort = Event()
+            self._acqAbort.clear()
+        except Exception,e:
+            self.error("Instrument.__init__() Exception: %s"%(e))
+            raise e
 
     def prepare(self):
         '''This method is called in the object construction but is necessary 
@@ -1028,64 +1034,197 @@ class Instrument(Logger):
                           %(err,self.interpretError(err)))
         return __strcut(debuginfo)
 
-class InstrumentSimulator(Instrument):
+class InstrumentSimulator(Logger):
     '''A pure python class that overloads the methods from the real instrument
       made to allow practical with fake data when no instrument is available.
     '''
     def __init__(self,mode=MODE_HIST,divider=1,binning=0,offset=0,
                  acqTime=1000,block=0,CFDLevels=[100,100],CFDZeroCross=[10,10],
                  stop=True,stopCount=HISTCHAN-1,debug=False):
-        Logger.__init__(self, debug)
-        self._name = "InstrumentSimulator"
-        if mode != MODE_HIST:
-            raise NotImplementedError("Only histogram mode supported")
-        self._mode = mode
-        self.initialise()
-        self._HW_Model = 'Simulator'
-        self._HW_PartNo = '000000'
-        self._HW_Version = '0.1'
-        self.__getHardwareInfo()
-        self.__calibrate()
-        #configurable parameters
-        self._SyncDivider = divider
-        self._CFDLevel = CFDLevels
-        self._CFDZeroCross = CFDZeroCross
-        self._Binning = binning
-        self._Offset = offset
-        self._acquisitionTime = acqTime#ms
-        self._startMeasTime = None
-        self._block = block
-        self._stop = stop
-        self._stopCount = stopCount
-        #readonly parameters
-        self._Resolution = 0.0
-        self._BaseResolution = 4.0#ps
-        #outputs
-        self._CountRate = [0,0]
-        self._counts = [0]*HISTCHAN
-        self._histograms = [[0L]*HISTCHAN]*8
-        self._flags = 0
-        self._integralCount = 0.0
-        self.prepare()
-        self._thread = None
-        self._acqAbort = Event()
-        self._acqAbort.clear()
-    
-    #Super class methods:
-    #def prepare(self)
-    #def acquire(self,async=False)
-    #def __acquisitionProcedure(self)
-    #def isAsyncAcquisitionDone(self)
-    #def abort(self)
-    #def __model__(self)
-    #def __partnum__(self)
-    #def __version__(self)
-    #def integralCount(self)
+        try:
+            deviceId = None
+            #super doesn't work
+#            super(Logger,self).__init__(debug)
+            Logger.__init__(self,debug)
+            self._name = "InstrumentSimulator"
+            if mode != MODE_HIST:
+                raise NotImplementedError("Only histogram mode supported")
+            self._mode = mode
+            self.initialise()
+            self._HW_Model = 'Simulator'
+            self._HW_PartNo = '000000'
+            self._HW_Version = '0.1'
+            self.__getHardwareInfo()
+            self.__calibrate()
+            #configurable parameters
+            self._SyncDivider = divider
+            self._CFDLevel = CFDLevels
+            self._CFDZeroCross = CFDZeroCross
+            self._Binning = binning
+            self._Offset = offset
+            self._acquisitionTime = acqTime#ms
+            self._startMeasTime = None
+            self._block = block
+            self._stop = stop
+            self._stopCount = stopCount
+            #readonly parameters
+            self._Resolution = 0.0
+            self._BaseResolution = 4.0#ps
+            #Simulation parameters
+            self.distribution('uniform')
+            self._groups = 10
+            #outputs
+            self._CountRate = [0,0]
+            self._counts = [0]*HISTCHAN
+            self._histograms = [[0L]*HISTCHAN]*8
+            self._flags = 0
+            self._integralCount = 0.0
+            self.prepare()
+            self._thread = None
+            self._acqAbort = Event()
+            self._acqAbort.clear()
+        except Exception,e:
+            self.error("InstrumentSimulator.__init__() Exception: %s"%(e))
+            raise e
+
+    def prepare(self):
+        '''This method is called in the object construction but is necessary 
+           to be called again if the SyncDiv is changed.
+        '''
+        self.debug("Preparing the instrument to acquire.")
+        self.setSyncDivider()
+        self.setInputCFD(0)
+        self.setInputCFD(1)
+        self.setBinning()
+        self.setOffset()
+        self.getResolution()
+        self.getCountRates()
+        #From dlldemo.c: after Init or SetSyncDiv you must allow 100 ms 
+        #for valid new count rate readings.
+        sleep(0.2)#200ms
+        self.setStopOverflow()
+        return self
+
+    def acquire(self,async=False):
+        '''Perform an acquisition in synchronous mode if it's not specified to
+           be asynchronous.
+           
+           Examples:
+           >>> instrument.acquire()           #synchronous acquisition
+           >>> instrument.acquire(async=True) #asynchronous acquisition
+        '''
+        #TODO: check if this should be asynchronous to have the possibility to 
+        #      see the histogram evolving during the acquisition.
+        if self._thread != None and self._thread.isAlive():
+            self.debug("Asynchronous acquisition in progress, please use "\
+                       "isAsyncAcquisitionDone() to know when it's finished.")
+            return False
+        if not async:
+            self.debug("Synchronous acquisition, return when finished")
+            return self.__acquisitionProcedure()
+        else:
+            self.debug("Asynchronous acquisition, check "\
+                       "isAsyncAcquisitionDone() to know it's finished")
+            self._thread = Thread(target=self.__acquisitionProcedure,
+                                  name="PicoHarpAcq")
+            self._thread.start()
+            return True
+
+    def __acquisitionProcedure(self):
+        '''This method does an acquisition bounded by the settings previously
+           set up (or in the constructor on changed by the setters).
+           
+           The time that the instrument will be measuring is set by the 
+           AcquisitionTime. The monitoring period inside this method will not
+           disturb that time. The only effect is that this method will take 
+           the exceed multiple of this time to return. The check is used to 
+           know when an abort is received or if there has been triggered an
+           error from the instrument. 
+        '''
+        try:
+            self.info("Starting Acquisition procedure...")
+            self.clearHistMem()
+            self.getCountRates()
+            self.startMeas()
+            sleep(ACQ_MONITOR_T)
+            waitloop = 0
+            self._acqAbort.clear()
+            while not self._acqAbort.isSet():
+                waitloop += 1
+                sleep(ACQ_MONITOR_T)
+                #Periodically the acquisition has to wake up to check if there
+                #has been an error (getCounterStatus will trigger an exception)
+                #or it's still running (getCounterStatus return 0) or it has
+                #ended (>0, usualy 1).
+                if self.getCounterStatus()>0:
+                    self.info("Acquisition completed")
+                    break
+            self.stopMeas()
+            self.getHistogram()
+            self.getFlags()
+            self.integralCount()
+            self.debug("waitloop = %d total count = %d"
+                       %(waitloop,self._integralCount))
+            if (self._flags&FLAG_OVERFLOW):
+                self.debug("Overflow!")
+                return False
+            if self._acqAbort.isSet():
+                self.debug("acquisition aborted!")
+                return False
+            return True
+        except IOError,e:
+            self.debug("I/O Error: %s"%(e))
+            return False
+
+    def isAsyncAcquisitionDone(self):
+        '''When an acquisition has been launched in asynchronous mode, this 
+           method with report if the acquisition has finished.
+        '''
+        if hasattr(self,'_thread') and self._thread != None:
+            return not self._thread.isAlive()
+        return True
+
+    def abort(self):
+        '''During an asynchronous acquisition, the way to stop a measurement 
+           is call this method.
+        '''
+        if self._thread == None or not self._thread.isAlive():
+            return False
+        self._acqAbort.set()
+        self.debug("Raised the abort flag!")
+        return True
+
+    @property
+    def __model__(self):
+        return self._HW_Model
+
+    @property
+    def __partnum__(self):
+        return self._HW_PartNo
+
+    @property
+    def __version__(self):
+        return self._HW_Version
+
+    def integralCount(self):
+        '''After get an histogram, calculate the accumulated counts in the 
+           array.
+        '''
+        integralCount = 0
+        for count in self._counts:
+            integralCount += count
+        self._integralCount = integralCount
+        self.debug("Integral count = %d"%(self._integralCount))
+        return self._integralCount
 
     def __del__(self):
         '''The destructor closes the connection with the instrument.
         '''
-        self.debug("Instrument connection closed.")
+        try:
+            if hasattr(self,'__debug'):
+                self.debug("Instrument connection closed.")
+        except Exception,e:
+            self.error("InstrumentSimulator.__del__() Exception: %s"%(e))
 
     def initialise(self):
         '''The instrument initialisation prepares the instrument for one of 
@@ -1116,6 +1255,7 @@ class InstrumentSimulator(Instrument):
            if it will not be used, set to 0 as the meaning of Null.
         '''
         return self._SyncDivider
+
     def setSyncDivider(self,syncDivider=None):
         '''Set to the instrument the value for the programmable divider in 
            front of the sync input. It's value must be with in SYNCDIVMIN 
@@ -1151,6 +1291,7 @@ class InstrumentSimulator(Instrument):
            Unit: mV
         '''
         return (self._CFDZeroCross[channel],self._CFDLevel[channel])
+
     def setInputCFD(self,channel,CFDZeroCross=None,CFDLevel=None):
         '''Each of the channels has its Constant Fraction Discriminator (CFD) 
            configurable, used to extract precise timing information from the 
@@ -1197,6 +1338,7 @@ class InstrumentSimulator(Instrument):
            Formula: resolution = baseResolution * (2^binning)
         '''
         return self._Binning
+
     def setBinning(self,Binning=None):
         '''The binning is used to modify the resolution (a read-only parameter)
            Its value can come from 0 to BINSTEPSMAX and it multiplies the
@@ -1220,6 +1362,7 @@ class InstrumentSimulator(Instrument):
            Unit: ns
         '''
         return self._Offset
+
     def setOffset(self,Offset=None):
         '''With lower sync rates the region of interest of the histogram could 
            be lie outside the acquisition window. With this value is the time 
@@ -1254,7 +1397,7 @@ class InstrumentSimulator(Instrument):
         self.debug("Resolution = %g"%(self._Resolution))
         return self._Resolution
     #There is no setter, use the binning.
-    
+
     def getCountRate(self,channel):
         '''For a given channel get the number of counts received per second.
            It must be passed at least 100ms after initialise() or 
@@ -1264,6 +1407,7 @@ class InstrumentSimulator(Instrument):
         self._CountRate[channel] = random.randint(9e5,1e6)
         self.debug("CountRate[%d] = %d"%(channel,self._CountRate[channel]))
         return self._CountRate[channel]
+
     def getCountRates(self,channel=None):
         '''Get the pair of count rates on both channels.
            It must be passed at least 100ms after initialise() or 
@@ -1289,6 +1433,7 @@ class InstrumentSimulator(Instrument):
            - ct: integer defining this maximum to stop
         '''
         return (self._stop,self._stopCount)
+
     def setStopOverflow(self,stop=None,count=None):
         '''The instrument acquisition can be configured to finish the 
            acquisition, even the acquisition time didn't finish, when any of 
@@ -1324,6 +1469,7 @@ class InstrumentSimulator(Instrument):
            specified precisely on any of those two calls).
         '''
         return self._block
+
     def setBlock(self,block):
         '''Set the instrument memory block to be used by default when start a 
            measurement or to get an histogram.
@@ -1351,6 +1497,7 @@ class InstrumentSimulator(Instrument):
            Unit: ms
         '''
         return self._acquisitionTime
+
     def setAcquisitionTime(self,AcquisitionTime):
         '''Set up the time that the instrument will accumulate. An acquisition
            may take less if there is configured an stop overflow.
@@ -1386,6 +1533,8 @@ class InstrumentSimulator(Instrument):
            - 0:  acquisition still running
            - >0: acquisition has ended.
         '''
+        self.info("elapsed: %g (acq: %g)"
+                  %(self.getElapsedMeasTime(),self._acquisitionTime))
         if self.getElapsedMeasTime() >= self._acquisitionTime:
             self.getHistogram()
             return 1
@@ -1400,23 +1549,47 @@ class InstrumentSimulator(Instrument):
                         self._histograms[self._block][pos] += 1
                         counts2add -= 1
                 except Exception,e:
-                    self.debug("Ups, this shouldn't happen in "\
+                    self.error("Ups, this shouldn't happen in "\
                                "getCounterStatus: %s"%(e))
+                    self.debug("Position = %d (max %d)"%(pos,HISTCHAN))
             #self.getHistogram()
             return 0
+
+    def distribution(self,value=None):
+        #cython doesn't support decorator @property.setter
+        if value == None:
+            return self._distribution
+        elif value in ['uniform','gaussian']:
+            self._distribution = value
+
+    def groups(self,value=None):
+        if value == None:
+            return self._groups
+        else:
+            self._groups = value
+
     def getRandomPosition(self):
-        #TODO: stablish how to change the distribution
-        distribution = 'gauss'
-        #normal random:
-        if distribution == 'basic':
-            pos = random.randint(0,HISTCHAN-1)
-        elif distribution == 'gauss':
-            group = random.randint(1,10)
-            shift = HISTCHAN/20
+        try:
+            groupSize = HISTCHAN/self.groups()
+            empty = groupSize/10
+            group = int(random.uniform(0,self.groups()))
             pos = -1
             while not (0 <=  pos <= HISTCHAN-1):
-                pos = int(random.gauss(group*HISTCHAN/10-shift,HISTCHAN/100))
-        return pos
+                section = group*groupSize
+                if self.distribution() == 'uniform':
+                    start = section+empty
+                    end = section+groupSize-empty
+                    pos = random.randrange(start,end,2)
+                elif self.distribution() == 'gaussian':
+                    mu = section+(groupSize/2)
+                    sigma = groupSize/self.groups()
+                    pos = int(random.gauss(mu,sigma))
+                    if not pos % 2:
+                        pos += 1
+            return pos
+        except Exception,e:
+            self.error("no random possition in %s: %s"%(self.distribution(),e))
+            return 1
 
     def stopMeas(self):
         '''Stops the current measurement.
@@ -1463,9 +1636,13 @@ class InstrumentSimulator(Instrument):
            currently acquiring.
         '''
         if not self._startMeasTime == None:
-            self.warning("now %s and start %s"%(datetime.now(),self._startMeasTime))
-            elapsed = \
-            (datetime.now() - self._startMeasTime).total_seconds()*1e3
+            #self.warning("now %s and start %s"
+            #             %(datetime.now(),self._startMeasTime))
+            t_diff = datetime.now() - self._startMeasTime
+            if hasattr(t_diff,'total_seconds'):
+                elapsed = t_diff.total_seconds()*1e3
+            else:
+                elapsed = t_diff.seconds*1e3
             self.debug("Measuring since %s"%(elapsed))
             return elapsed
         else:
@@ -1474,8 +1651,10 @@ class InstrumentSimulator(Instrument):
     def getWarnings(self):
         self.getCountRates()#this must be called before getWarninings
         return 17
+
     def getWarningsText(self,warnings=None):
         return ""
+
     def getHardwareDebugInfo(self):
         return "FPGA mode:      0\n"\
                "Device state:     3\n"\

@@ -226,9 +226,11 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def connect(self):
         try:
             if not self.Simulation:
+                self.debug_stream("Building a Photon Counter Instrument.")
                 self._devidx = self._discoverer.search(self.SerialNumber)
                 self._instrument = PicoHarp.Instrument(self._devidx,debug=True)
             else:
+                self.debug_stream("Building a Photon Counter Simulation.")
                 self._instrument = PicoHarp.InstrumentSimulator(debug=True)
             self.set_state(PyTango.DevState.ON)
             self.set_status("Connected to the instrument.")
@@ -616,6 +618,14 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._prepareDiscoverInstrument()
         self.set_state(PyTango.DevState.OFF)
         self._launchThread()
+        i = 0; imax = 10
+        while not self.isConnected() or i == imax:
+            self.info_stream("Waiting connection Thread")
+            time.sleep(imax-i)
+            i += 1
+        if i == imax:
+            self.set_state(PyTango.DevState.FAULT)
+            self.set_status("Too long to make the connection...")
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.init_device
 
     def always_executed_hook(self):
