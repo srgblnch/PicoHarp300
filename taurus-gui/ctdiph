@@ -1,4 +1,5 @@
 #!/bin/bash
 #taurusform sr/di/FillingPatternFCT-01/{nAcquisitions,StartingPoint,Threshold,ScaleH,OffsetH,TimingTrigger,resultingFrequency,FilledBunches,SpuriousBunches} sr02/di/sco-01/{Channel1,CurrentSampleRate,ScaleH,OffsetH} sr/di/FillingPatternFCT-01/{BunchIntensity,State,Status}
-taurusgui ctdiph $*
+#taurusgui ctdiph $*
+python PicoHarpGui.py $*
 

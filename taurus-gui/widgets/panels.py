@@ -28,71 +28,48 @@
 
 #TODO: instrument warnings text messages
 
-from taurus.external.qt import Qt#,QtCore
-from taurus.qt.qtgui.panel import TaurusCommandsForm
+from taurus.external.qt import Qt
+from taurus.qt.qtgui.panel import TaurusForm,TaurusCommandsForm
+from taurus.qt.qtgui.plot import TaurusPlot,TaurusCurve
 
 class PhCtCommands(TaurusCommandsForm):
     def __init__(self, parent = None, designMode = False):
-        TaurusCommandsForm.__init__(self, parent, designMode)
-        commandsFilterList = [lambda x: x.cmd_name in ['Acquire','Abort',
-                                                       'Start','Stop']]
+        super(PhCtCommands,self).__init__(parent, designMode)
+        commandsFilterList = [lambda x: x.cmd_name in ['Init',
+                                                       'On','Off',
+                                                       'Acquire','Start',
+                                                       'Stop','Abort']]
         self.setViewFilters(commandsFilterList)
+        self._splitter.setSizes([1,0])
 
-from taurus.qt.qtgui.panel import TaurusForm
 
 class PhCtForm(TaurusForm):
     def __init__(self, parent = None,
                  formWidget = None,
                  buttons = None,
-                 withButtons = True, 
+                 withButtons = False, 
                  designMode = False):
-        TaurusForm.__init__(self,parent,formWidget,buttons,
+        super(PhCtForm,self).__init__(parent,formWidget,buttons,
                             withButtons,designMode)
-        self._PhCtModel = ""
-        
-    def getModel(self):
-        return self._PhCtModel
-    def setModel(self,model):
-        attrList = ["%s/%s"%(model,attrName) for attrName in self._attributes]
-        TaurusForm.setModel(attrList)
-        self._PhCtModel = model
 
-AcquisitionForm = TaurusForm
 
-#class AcquisitionForm(PhCtForm):
-#    _attributes = ['resolution','binning','offset',
-#                   'acquisitiontime','ElapsedMeasTime',
-#                   'overflowstopper','overflowstopperthreshold']
+AcquisitionForm = PhCtForm
 
-Channel0Form = TaurusForm
 
-#class Channel0Form(PhCtForm):
-#    _attributes = ['zerocrossch0','levelch0','syncdivider']
+Channel0Form = PhCtForm
 
-Channel1Form = TaurusForm
 
-#class Channel1Form(PhCtForm):
-#    _attributes = ['zerocrossch1','levelch1']
+Channel1Form = PhCtForm
 
-MonitorForm = TaurusForm
 
-#class MonitorForm(PhCtForm):
-#    _attributes = ['countratech0','countratech1',
-#                   'integralcount','HistogramMaxValue']
+MonitorForm = PhCtForm
 
-StateForm = TaurusForm
 
-#class StateForm(PhCtForm):
-#    _attributes = ['State','Status']
+StateForm = PhCtForm
 
-WargningForm = TaurusForm
 
-#class WargningForm(PhCtForm):
-#    _attributes = ['Warnings']
+WargningForm = PhCtForm
 
-from taurus.qt.qtgui.plot import TaurusPlot,TaurusCurve
-
-#HistogramPlot = TaurusPlot
 
 class HistogramPlot(TaurusPlot):
     pass
@@ -133,8 +110,12 @@ class HistogramPlot(TaurusPlot):
 
     #TODO: two curves must be set up per model (in fact, only one model is 
     #      accepted).
-        
+
+
 class ChangingCurve(TaurusCurve):
     pass
+
+
 class ValidCurve(TaurusCurve):
     pass
+
