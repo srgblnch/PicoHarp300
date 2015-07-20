@@ -66,15 +66,15 @@ class TaurusDevCombo(TaurusWidget):
         TaurusWidget.__init__(self, parent, designMode=designMode)
         self.loadUi()
         self._selectedDevice = ""
+        if hasattr(self.modelChosen,'_parent'):
+            self.modelChosen._parent = self
         try:
             self._ui.selectorCombo.currentIndexChanged.connect(self.selection)
         except Exception,e:
-            self.deprecated("Using deprecated connect signal")
+            self.warning("Using deprecated connect signal")
             Qt.QObject.connect(self._ui.selectorCombo,
                                Qt.SIGNAL('currentIndexChanged(int)'),
                                self.selection)
-        if hasattr(self.modelChosen,'_parent'):
-            self.modelChosen._parent = self
 
     @classmethod
     def getQtDesignerPluginInfo(cls):

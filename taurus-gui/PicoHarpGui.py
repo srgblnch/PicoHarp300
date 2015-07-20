@@ -31,7 +31,7 @@ from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from widgets import *
 
-DEVICESERVERNAME = 'ph_photoncounter'
+DEVICESERVERNAME = 'PH_PhotonCounter'
 
 
 MODELS = 'models'
