@@ -1083,6 +1083,9 @@ class InstrumentSimulator(Logger):
             self._thread = None
             self._acqAbort = Event()
             self._acqAbort.clear()
+            self._counter = None
+            self._counterStop = Event()
+            self._counterStop.clear()
         except Exception,e:
             self.error("InstrumentSimulator.__init__() Exception: %s"%(e))
             raise e
@@ -1127,6 +1130,10 @@ class InstrumentSimulator(Logger):
                        "isAsyncAcquisitionDone() to know it's finished")
             self._thread = Thread(target=self.__acquisitionProcedure,
                                   name="PicoHarpAcq")
+            if self._counter == None:
+                self._counter = Thread(target=self.__addCounts,name="Counter")
+            if not self._counter.isAlive():
+                self._counter.start()
             self._thread.start()
             return True
 
@@ -1142,6 +1149,12 @@ class InstrumentSimulator(Logger):
            error from the instrument. 
         '''
         try:
+            if self._counter != None and self._counter.isAlive():
+                self.warning("There is already a counter there")
+                self._counterStop.set()
+            self._counter = Thread(target=self.__addCounts,name="Counter")
+            self._counter.start()
+            
             self.info("Starting Acquisition procedure...")
             self.clearHistMem()
             self.getCountRates()
@@ -1159,6 +1172,7 @@ class InstrumentSimulator(Logger):
                 if self.getCounterStatus()>0:
                     self.info("Acquisition completed")
                     break
+            self._counterStop.set()
             self.stopMeas()
             self.getHistogram()
             self.getFlags()
@@ -1539,21 +1553,29 @@ class InstrumentSimulator(Logger):
             self.getHistogram()
             return 1
         else:
-            #counts to add
-            counts2add = random.randint(1e6,1e9)
-            self.debug("Add %d counts"%(counts2add))
-            while counts2add > 0:
+            return 0
+
+    def __addCounts(self,minimum=1e3,maximum=1e6):
+        while self._thread != None or not self._acqAbort.isSet():
+            counts2add = random.randint(minimum,maximum)
+            addedCounts = 0
+            self.info("Add %d counts"%(counts2add))
+            t_0 = datetime.now()
+            while addedCounts < counts2add:
                 pos = self.getRandomPosition()
                 try:
                     if self._histograms[self._block][pos] < HISTCHAN:
                         self._histograms[self._block][pos] += 1
-                        counts2add -= 1
+                        addedCounts += 1
                 except Exception,e:
                     self.error("Ups, this shouldn't happen in "\
                                "getCounterStatus: %s"%(e))
                     self.debug("Position = %d (max %d)"%(pos,HISTCHAN))
-            #self.getHistogram()
-            return 0
+                if addedCounts % int(counts2add*0.1) == 0:
+                    t_diff = datetime.now() - t_0
+                    self.info("Added %d of %d counts (%s)"
+                              %(addedCounts,counts2add,t_diff))
+                    sleep(0.1)
 
     def distribution(self,value=None):
         #cython doesn't support decorator @property.setter
@@ -1636,14 +1658,12 @@ class InstrumentSimulator(Logger):
            currently acquiring.
         '''
         if not self._startMeasTime == None:
-            #self.warning("now %s and start %s"
-            #             %(datetime.now(),self._startMeasTime))
             t_diff = datetime.now() - self._startMeasTime
             if hasattr(t_diff,'total_seconds'):
                 elapsed = t_diff.total_seconds()*1e3
             else:
-                elapsed = t_diff.seconds*1e3
-            self.debug("Measuring since %s"%(elapsed))
+                elapsed = t_diff.seconds*1e3+t_diff.microseconds/1e3
+            self.info("Measuring since %s miliseconds"%(elapsed))
             return elapsed
         else:
             return 0
