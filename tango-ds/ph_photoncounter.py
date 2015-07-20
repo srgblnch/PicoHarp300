@@ -231,7 +231,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                 self._instrument = PicoHarp.Instrument(self._devidx,debug=True)
             else:
                 self.debug_stream("Building a Photon Counter Simulation.")
-                self._instrument = PicoHarp.InstrumentSimulator(debug=True)
+                self._instrument = PicoHarp.InstrumentSimulator(debug=False)
             self.set_state(PyTango.DevState.ON)
             self.set_status("Connected to the instrument.")
             self.fireEventsList([
@@ -298,7 +298,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if not hasattr(self,'_communicationsThread') or \
         self._communicationsThread == None:
             self._communicationsThread = \
-                           threading.Thread(target=self._prepareCommunications)
+                           threading.Thread(target=self._prepareCommunications,
+                                            name="Communications")
 
     def _launchThread(self):
         try:
@@ -436,7 +437,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     
     def singleAcquisition(self):
         self.clean_status()
-        self._acquisitionThread = threading.Thread(target=self._doSingleAcq)
+        self._acquisitionThread = threading.Thread(target=self._doSingleAcq,
+                                                   name="SingleAcq")
         self._acquisitionStop.clear()
         self._acquisitionThread.start()
         
@@ -492,7 +494,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def continuousAcquisition(self):
         self.clean_status()
         self._acquisitionStop.clear()
-        self._acquisitionThread = threading.Thread(target=self._doContinuousAcq)
+        self._acquisitionThread = threading.Thread(target=self._doContinuousAcq,
+                                                   name="ContinuousAcq")
         self._acquisitionThread.start()
         
     def _doContinuousAcq(self):
