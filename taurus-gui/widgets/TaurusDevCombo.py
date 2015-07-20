@@ -24,19 +24,57 @@
 #?__docformat__ = 'restructuredtext'
 
 import sys
-from taurus.external.qt import Qt,QtCore
+from taurus import Database,Logger
 from taurus.qt.qtgui.util.ui import UILoadable
 from taurus.qt.qtgui.panel import TaurusWidget
-import taurus
+from taurus.external.qt import Qt,QtGui,QtCore
+
+####
+#--- Extra furniture for PyQt4.4 & numpy 1.3 backward compatibility
+try:#normal way
+    from taurus.external.qt import Qt,QtGui,QtCore
+except:#backward compatibility to pyqt 4.4.3
+    from taurus.qt import Qt,QtGui
+
+class MyQtSignal(Logger):
+    '''This class is made to emulate the pyqtSignals for too old pyqt versions.
+    '''
+    def __init__(self,name,parent=None):
+        Logger.__init__(self)
+        self._parent = parent
+        self._name = name
+        self._cb = []
+    def emit(self):
+        self.info("Signal %r emit (%s)"%(self._name,self._cb))
+        Qt.QObject.emit(self._parent,Qt.SIGNAL(self._name))
+        self.debug("Having callback list of %d elements"%(len(self._cb)))
+        for cb in self._cb:
+            self.debug("Calling %r"%(cb))
+            cb()
+    def connect(self,callback):
+        self.error("Trying a connect on MyQtSignal(%s)"%(self._name))
+        #raise Exception("Invalid")
+        self._cb.append(callback)
 
 @UILoadable(with_ui='_ui')
 class TaurusDevCombo(TaurusWidget):
-    modelChosen = QtCore.pyqtSignal()
+    try:
+        modelChosen = QtCore.pyqtSignal()
+    except:
+        modelChosen = MyQtSignal('modelChosen')
     def __init__(self, parent=None, designMode=False):
         TaurusWidget.__init__(self, parent, designMode=designMode)
         self.loadUi()
         self._selectedDevice = ""
-        self._ui.selectorCombo.currentIndexChanged.connect(self.selection)
+        try:
+            self._ui.selectorCombo.currentIndexChanged.connect(self.selection)
+        except Exception,e:
+            self.deprecated("Using deprecated connect signal")
+            Qt.QObject.connect(self._ui.selectorCombo,
+                               Qt.SIGNAL('currentIndexChanged(int)'),
+                               self.selection)
+        if hasattr(self.modelChosen,'_parent'):
+            self.modelChosen._parent = self
 
     @classmethod
     def getQtDesignerPluginInfo(cls):
@@ -52,7 +90,7 @@ class TaurusDevCombo(TaurusWidget):
         self._ui.selectorCombo.addItems(self._deviceNames.keys())
 
     def getDeviceListByDeviceServerName(self,deviceServerName):
-        db = taurus.Database()
+        db = Database()
         foundInstances = db.getServerNameInstances(deviceServerName)
         self.debug("by %s found %d instances: %s."
                    %(deviceServerName,len(foundInstances),
