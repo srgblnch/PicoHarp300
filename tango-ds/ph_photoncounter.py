@@ -191,22 +191,42 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if self.attr_TimeBetweenChanging_read == 0:
             self.attr_TimeBetweenChanging_read = DEFAULT_TIME_BETWEEN_CHANGING
         return self.attr_TimeBetweenChanging_read
+
     def setTimeBetweenChangin(self,value):
         if value < MIN_TIME_BETWEEN_CHANGING:
             value = MIN_TIME_BETWEEN_CHANGING
         if value != self.attr_TimeBetweenChanging_read:
             self.fireEventsList([['TimeBetweenChanging',value]])
         self.attr_TimeBetweenChanging_read = value
+
     def getTimeHoldingAlarm(self):
         if self.attr_TimeHoldingAlarm_read == 0:
             self.attr_TimeHoldingAlarm_read = DEFAULT_TIME_HOLD_ALARM
         return self.attr_TimeHoldingAlarm_read
+
     def setTimeHoldingAlarm(self,value):
         if value < MIN_TIME_HOLD_ALARM:
             value = MIN_TIME_HOLD_ALARM
         if value != self.attr_TimeHoldingAlarm_read:
             self.fireEventsList([['TimeHoldingAlarm',value]])
         self.attr_TimeHoldingAlarm_read = value
+
+    def emitWarnings(self,endState):
+        warnings = self._instrument.getWarnings()
+        if warnings != 0:
+            self._alarmState_time = time.time()
+            self.fireEventsList([['Warnings',self._instrument.getWarningsText(warnings)]])
+            self.set_state(PyTango.DevState.ALARM)
+        else:
+            self.cleanWarnings(endState)
+
+    def cleanWarnings(self,endState):
+        if self._alarmState_time is not None:
+            now = time.time()
+            timelapsed = now - self._alarmState_time
+            if timelapsed >= self.getTimeHoldingAlarm():
+                self._alarmState_time = None
+                self.set_state(endState)
     #---- Done events region
 
     #---- Instrument connectivity region
@@ -445,21 +465,17 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.set_state(PyTango.DevState.RUNNING)
             self._instrument.acquire(async=True)
             while not self._instrument.isAsyncAcquisitionDone():
+                self.cleanWarnings(PyTango.DevState.RUNNING)
                 if self._acquisitionStop.isSet():
                     self.warn_stream("Proceeding with Abort()")
                     self._instrument.abort()
                     break
-                time.sleep(self.getTimeBetweenChanging())
                 #launch events with "changing" quality
                 self.fireAcqusitionEvents(PyTango.AttrQuality.ATTR_CHANGING)
+                time.sleep(self.getTimeBetweenChanging())
             #launch final events with quality "valid"
             self.fireAcqusitionEvents()
-            warnings = self._instrument.getWarnings()
-            if warnings != 0:
-                self.fireEventsList([['Warnings',self._instrument.getWarningsText(warnings)]])
-                self.set_state(PyTango.DevState.ALARM)
-            else:
-                self.set_state(endState)
+            self.emitWarnings(endState)
         except IOError,e:
             msg = "Catch IOError exception: %s"%(e)
             self.error_stream(msg)
@@ -497,10 +513,6 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.set_state(PyTango.DevState.STANDBY)
         while not self._acquisitionStop.isSet():
             self._doSingleAcq(endState=PyTango.DevState.STANDBY)
-            if self.get_state() == PyTango.DevState.ALARM:
-                #in case of alarms, extend the time between acq to 
-                #allow the alarm to be saw.
-                time.sleep(self.getTimeHoldingAlarm())
         if self.get_state() != PyTango.DevState.FAULT:
             self.set_state(PyTango.DevState.ON)
     def _cleanThreading(self):
@@ -614,6 +626,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self._prepareThreading()
         self._prepareDiscoverInstrument()
         self.set_state(PyTango.DevState.OFF)
+        self._alarmState_time = None
         self._launchThread()
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.init_device
 
