@@ -477,7 +477,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         try:
             if not self._instrument:
                 return
-            self.set_state(PyTango.DevState.RUNNING)
+            self.cleanWarnings(PyTango.DevState.RUNNING)
             self._instrument.acquire(async=True)
             while not self._instrument.isAsyncAcquisitionDone():
                 self.cleanWarnings(PyTango.DevState.RUNNING)
