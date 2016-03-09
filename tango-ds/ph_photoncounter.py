@@ -602,6 +602,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         self.attr_TimeHoldingAlarm_read = 0.0
         self.attr_Histogram_read = [0]
         #----- PROTECTED REGION ID(PH_PhotonCounter.init_device) ENABLED START -----#
+        self.attr_AcquisitionTime_read = 1.0
         if self.get_state() == PyTango.DevState.FAULT:
             self.disconnect()
             self._cleanThreading()
