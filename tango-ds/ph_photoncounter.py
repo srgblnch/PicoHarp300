@@ -59,7 +59,7 @@ import math
 import numpy as np
 import PicoHarp
 import pprint #used for Exec()
-from subprocess import call
+from subprocess import call  # used for usb recovery system call
 #from usbreset import usbreset
 import threading
 import time
@@ -155,10 +155,9 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
            timestamp.
         '''
         if log:
-            self.debug_stream("In fireEventsList():\n%s"
-                              % (''.join("\t%s\n"
-                                         % (self._debugAttributeEvent(line)
-                                         for line in eventsAttrList))))
+            debugLst = ''.join("\t%s\n" % self._debugAttributeEvent(line)
+                                      for line in eventsAttrList)
+            self.debug_stream("In fireEventsList():\n%s" % (debugLst))
         timestamp = time.time()
         attrNames = []
         for attrEvent in eventsAttrList:
