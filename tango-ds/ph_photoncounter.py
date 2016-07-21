@@ -95,6 +95,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     _instrument = None
     _acquisitionThread = None
     _acquisitionStop = None
+    _acquisitionAbort = None
     _communicationsThread = None
     #---- Events region
     def set_state(self, newState):
@@ -242,6 +243,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             if timelapsed >= self.getTimeHoldingAlarm():
                 self._alarmState_time = None
                 self.set_state(endState)
+        else:
+            self.set_state(endState)
     #---- Done events region
 
     #---- Instrument connectivity region
@@ -337,9 +340,37 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         if self._acquisitionStop is None:
             self._acquisitionStop = threading.Event()
             self._acquisitionStop.clear()
+        if self._acquisitionAbort is None:
+            self._acquisitionAbort = threading.Event()
+            self._acquisitionAbort.clear()
         if self._communicationsThread is None:
             self._communicationsThread = \
                 threading.Thread(target=self._prepareCommunications)
+            self._communicationsThread.setDaemon(True)
+
+    def _cleanThreading(self):
+        if self._communicationsThread is not None:
+            if self._communicationsThread.isAlive():
+                if self._communicationsThread.join(0.1):#s
+                    try:
+                        self._communicationsThread.exit()
+                    except Exception,e:
+                        self.warn_stream("Couldn't finish the "\
+                                         "communication thread")
+            self._communicationsThread = None
+        if self._acquisitionThread is not None:
+            if self._acquisitionThread.isAlive():
+                try:
+                    if self._acquisitionStop is not None:
+                        self._acquisitionStop.set()
+                    if self._acquisitionAbort is not None:
+                        self._acquisitionAbort.set()
+                    if self._acquisitionThread.join(1):#s
+                        self._acquisitionThread.exit()
+                except Exception,e:
+                        self.warn_stream("Couldn't finish the "\
+                                         "acquisition thread")
+            self._acquisitionThread = None
 
     def _launchThread(self):
         self.debug_stream("Launch communication thread")
@@ -498,22 +529,78 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                                  ['Histogram', histogram, quality]])
 
     def singleAcquisition(self):
+        if self._acquisitionThread is not None:
+            if self._acquisitionStop is None or \
+                    self._acquisitionStop.isSet():
+                self.warn_stream("Acquisition thread already made "
+                                 "but ended")
+                self._acquisitionThread = None
+            else:
+                self.warn_stream("Acquisition thread already made "
+                                 "and running")
         self.clean_status()
-        self._acquisitionThread = threading.Thread(target=self._doSingleAcq)
-        if self._acquisitionStop is not None:
+        if self._acquisitionThread is None:
+            self._acquisitionThread = threading.Thread(target=self._doSingleAcq)
+            if self._acquisitionStop is None:
+                self._acquisitionStop = threading.Event()
             self._acquisitionStop.clear()
-        self._acquisitionThread.start()
+            if self._acquisitionAbort is None:
+                self._acquisitionAbort = threading.Event()
+            self._acquisitionAbort.clear()
+            self._acquisitionThread.setDaemon(True)
+            self._acquisitionThread.start()
 
-    def _doSingleAcq(self, endState=PyTango.DevState.ON):
+    def continuousAcquisition(self):
+        if self._acquisitionThread is not None:
+            if self._acquisitionStop is None or \
+                    self._acquisitionStop.isSet():
+                self.warn_stream("Acquisition thread already made "
+                                 "but ended")
+                self._acquisitionThread = None
+            else:
+                self.warn_stream("Acquisition thread already made "
+                                 "and running")
+        self.clean_status()
+        if self._acquisitionThread is None:
+            if self._acquisitionStop is None:
+                self._acquisitionStop = threading.Event()
+            self._acquisitionStop.clear()
+            if self._acquisitionAbort is None:
+                self._acquisitionAbort = threading.Event()
+            self._acquisitionAbort.clear()
+            self._acquisitionThread = threading.Thread(\
+                target=self._doContinuousAcq)
+            self._acquisitionThread.setDaemon(True)
+            self._acquisitionThread.start()
+
+    def _doSingleAcq(self):
+        self.debug_stream("Prepare a single acquisition")
+        self._doOneAcq()
+        self._acquisitionThread = None
+        self.debug_stream("Ending single acquisition")
+
+    def _doContinuousAcq(self):
+        self.debug_stream("Prepare a continuous acquisition")
+        self.set_state(PyTango.DevState.STANDBY)
+        while self._acquisitionStop is not None and \
+                not self._acquisitionStop.isSet():
+            self._doOneAcq(endState=PyTango.DevState.ON)
+        if self.get_state() != PyTango.DevState.FAULT:
+            self.set_state(PyTango.DevState.ON)
+        self._acquisitionThread = None
+        self.debug_stream("Ending continuous acquisition")
+
+    def _doOneAcq(self, endState=PyTango.DevState.ON):
         try:
             if self._instrument is None:
                 return
+            self.set_state(endState)
             self.cleanWarnings(PyTango.DevState.RUNNING)
             self._instrument.acquire(async=True)
             while not self._instrument.isAsyncAcquisitionDone():
                 self.cleanWarnings(PyTango.DevState.RUNNING)
-                if self._acquisitionStop is None or \
-                        self._acquisitionStop.isSet():
+                if self._acquisitionAbort is None or \
+                        self._acquisitionAbort.isSet():
                     self.warn_stream("Proceeding with Abort()")
                     self._instrument.abort()
                     break
@@ -551,48 +638,6 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.set_status(msg)
             if self._acquisitionStop is not None:
                 self._acquisitionStop.set()
-
-    def continuousAcquisition(self):
-        self.clean_status()
-        if self._acquisitionStop is not None:
-            self._acquisitionStop.clear()
-        if self._acquisitionThread is None:
-            self._acquisitionThread = threading.Thread(\
-                target=self._doContinuousAcq)
-            self._acquisitionThread.start()
-        else:
-            self.warn_stream("Continuous Acquisition already made")
-
-    def _doContinuousAcq(self):
-        self.debug_stream("Prepare a continuous acquisition")
-        self.set_state(PyTango.DevState.STANDBY)
-        while self._acquisitionStop is not None and \
-                not self._acquisitionStop.isSet():
-            self._doSingleAcq(endState=PyTango.DevState.ON)
-        if self.get_state() != PyTango.DevState.FAULT:
-            self.set_state(PyTango.DevState.ON)
-
-    def _cleanThreading(self):
-        if self._communicationsThread is not None:
-            if self._communicationsThread.isAlive():
-                if self._communicationsThread.join(0.1):#s
-                    try:
-                        self._communicationsThread.exit()
-                    except Exception,e:
-                        self.warn_stream("Couldn't finish the "\
-                                         "communication thread")
-            self._communicationsThread = None
-        if self._acquisitionThread is not None:
-            if self._acquisitionThread.isAlive():
-                try:
-                    if self._acquisitionStop is not None:
-                        self._acquisitionStop.set()
-                    if self._acquisitionThread.join(1):#s
-                        self._acquisitionThread.exit()
-                except Exception,e:
-                        self.warn_stream("Couldn't finish the "\
-                                         "acquisition thread")
-            self._acquisitionThread = None
     #---- Done threaded acquisition region
 
     #---- Dynamic attributes region
@@ -1628,6 +1673,8 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         :rtype: PyTango.DevVoid """
         self.debug_stream("In Abort()")
         #----- PROTECTED REGION ID(PH_PhotonCounter.Abort) ENABLED START -----#
+        if self._acquisitionAbort is not None:
+            self._acquisitionAbort.set()
         if self._acquisitionStop is not None:
             self._acquisitionStop.set()
         #----- PROTECTED REGION END -----#	//	PH_PhotonCounter.Abort
