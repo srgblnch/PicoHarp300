@@ -528,7 +528,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
     def _doContinuousAcq(self):
         self.set_state(PyTango.DevState.STANDBY)
         while not self._acquisitionStop.isSet():
-            self._doSingleAcq(endState=PyTango.DevState.STANDBY)
+            self._doSingleAcq(endState=PyTango.DevState.ON)
         if self.get_state() != PyTango.DevState.FAULT:
             self.set_state(PyTango.DevState.ON)
 
