@@ -519,11 +519,18 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             histogram = self._instrument.getHistogram()
             HistogramMaxValue = long(np.array(histogram).max())
             ElapsedMeasTime = self._instrument.getElapsedMeasTime()/1000.
+            if quality is PyTango.AttrQuality.ATTR_CHANGING and \
+                    self._acquisitionStop is not None and \
+                    self._acquisitionStop.isSet():
+                ElapsedMeasTimeQuality = PyTango.AttrQuality.ATTR_WARNING
+            else:
+                ElapsedMeasTimeQuality = quality
             self.fireEventsList([['CountRateCh0', countRate[0], quality],
                                  ['CountRateCh1', countRate[1], quality],
                                  ['Flags', flags, quality],
                                  ['IntegralCount', IntegralCount, quality],
-                                 ['ElapsedMeasTime', ElapsedMeasTime, quality],
+                                 ['ElapsedMeasTime', ElapsedMeasTime,
+                                  ElapsedMeasTimeQuality],
                                  ['HistogramMaxValue', HistogramMaxValue,
                                   quality],
                                  ['Histogram', histogram, quality]])
@@ -594,6 +601,7 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
         try:
             if self._instrument is None:
                 return
+            stop = False
             self.set_state(endState)
             self.cleanWarnings(PyTango.DevState.RUNNING)
             self._instrument.acquire(async=True)
@@ -604,6 +612,12 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
                     self.warn_stream("Proceeding with Abort()")
                     self._instrument.abort()
                     break
+                if stop is False and self._acquisitionStop is None or \
+                        self._acquisitionStop.isSet():
+                    msg = "Instrument will Stop when this acquisition ends"
+                    self.warn_stream(msg)
+                    self.set_status(msg)
+                    stop = True
                 #launch events with "changing" quality
                 self.fireAcqusitionEvents(PyTango.AttrQuality.ATTR_CHANGING)
                 time.sleep(self.getTimeBetweenChanging())
