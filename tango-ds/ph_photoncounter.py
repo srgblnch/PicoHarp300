@@ -652,6 +652,14 @@ class PH_PhotonCounter (PyTango.Device_4Impl):
             self.set_status(msg)
             if self._acquisitionStop is not None:
                 self._acquisitionStop.set()
+            invalid = PyTango.AttrQuality.ATTR_INVALID
+            self.fireEventsList([['CountRateCh0', 0, invalid],
+                     ['CountRateCh1', 0, invalid],
+                     ['Flags', 0, invalid],
+                     ['IntegralCount', 0, invalid],
+                     ['ElapsedMeasTime', 0, invalid],
+                     ['HistogramMaxValue', 0, invalid],
+                     ['Histogram', [], invalid]])
     #---- Done threaded acquisition region
 
     #---- Dynamic attributes region
