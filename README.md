@@ -22,6 +22,6 @@ input an oscilloscope waveform) to measure the Filling Pattern.
 
 More detailed information in the subdiretories:
 * library: the cython code
-* src: the tango device server
+* tango-ds: the tango device server
 * taurusgui: the taurus description to launch the gui.
 
